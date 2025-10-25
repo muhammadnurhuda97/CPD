@@ -1,17 +1,17 @@
-# Laravel default ignores
+# Laravel default
 /vendor
 /node_modules
 /public/storage
-/storage/*.key
-.env
-.env.*
-.idea
-.vscode
-.DS_Store
-npm-debug.log
-yarn-error.log
+/storage/*
+/.env
+/.env.*
+/.DS_Store
+/npm-debug.log
+/yarn-error.log
+CPD.zip
+cek-starsender.php
 
-# File debug / tidak perlu
+# Files hasil debug / testing pribadi
 bank
 bill_key
 biller_code
@@ -26,3 +26,5 @@ url
 user_id
 va_number
 waNotificationService
+CPD.zip
+cek-starsender.php
