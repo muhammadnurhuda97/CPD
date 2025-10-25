@@ -10,7 +10,6 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        /* Style Anda yang sudah responsif, tidak ada perubahan di sini */
         body {
             font-family: 'Poppins', sans-serif;
             background-color: #f4f6f9;
@@ -103,10 +102,6 @@
             flex-wrap: wrap;
         }
 
-        .actions form {
-            margin: 0;
-        }
-
         .btn {
             display: inline-block;
             padding: 12px 25px;
@@ -118,6 +113,7 @@
             cursor: pointer;
             font-family: 'Poppins', sans-serif;
             font-size: 1rem;
+            text-align: center;
         }
 
         .btn-primary {
@@ -191,12 +187,7 @@
                 gap: 10px;
             }
 
-            .actions .btn,
-            .actions form {
-                width: 100%;
-            }
-
-            .btn {
+            .actions .btn {
                 width: 100%;
                 box-sizing: border-box;
             }
@@ -238,7 +229,6 @@
                                 title="Klik untuk salin">{{ $paymentDetails['payment_code'] }}</strong></p>
                         <p>Tunjukkan kode ini kepada kasir.</p>
                     @elseif($paymentDetails['payment_type'] === 'qris')
-                        {{-- ===== AWAL PERBAIKAN ===== --}}
                         @if (!empty($paymentDetails['qris_url']))
                             <p><strong>QRIS:</strong></p>
                             <p>Silakan scan kode QR di bawah ini menggunakan aplikasi e-wallet atau mobile banking Anda.
@@ -251,7 +241,6 @@
                                 menampilkannya.
                             </div>
                         @endif
-                        {{-- ===== AKHIR PERBAIKAN ===== --}}
                     @endif
 
                     @if (!empty($paymentDetails['expiry_time']))
@@ -269,19 +258,23 @@
             <p class="footer-note">Detail pembayaran juga akan/telah dikirim melalui WhatsApp.</p>
 
             <div class="actions">
-                <form action="{{ route('payment.cancel', ['orderId' => $transactionInfo['id']]) }}" method="POST"
-                    onsubmit="return confirm('Apakah Anda yakin ingin membatalkan pembayaran ini dan memilih metode lain?');">
-                    @csrf
-                    <button type="submit" class="btn btn-secondary">Batal & Ganti Metode Bayar</button>
-                </form>
+                {{-- ===== AWAL PERBAIKAN ===== --}}
+                {{-- Mengubah dari form POST menjadi link GET agar sesuai dengan route --}}
+                <a href="{{ route('payment.cancel', ['orderId' => $transactionInfo['id']]) }}"
+                    class="btn btn-secondary"
+                    onclick="return confirm('Apakah Anda yakin ingin membatalkan pembayaran ini dan memilih metode lain?');">
+                    Ganti Metode Bayar
+                </a>
+                {{-- ===== AKHIR PERBAIKAN ===== --}}
+
                 <button id="checkStatusBtn" class="btn btn-primary">Cek Ulang Status</button>
             </div>
-            <p id="statusMessage" class="status-message"></p>
         </div>
     </div>
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+            // Fungsi untuk menyalin teks ke clipboard
             const copyableElements = document.querySelectorAll(".copy-to-clipboard");
             copyableElements.forEach(element => {
                 element.addEventListener("click", function(event) {
@@ -306,83 +299,22 @@
                 });
             });
 
+            // Fungsi untuk tombol cek status
             const checkStatusBtn = document.getElementById('checkStatusBtn');
             if (checkStatusBtn) {
                 checkStatusBtn.addEventListener('click', function() {
                     Swal.fire({
                         title: 'Memeriksa Status...',
+                        text: 'Halaman akan dimuat ulang dengan status terbaru.',
                         allowOutsideClick: false,
                         didOpen: () => {
                             Swal.showLoading();
                         }
                     });
-                    window.location.href = "{{ route('payment.success') }}?order_id=" +
-                        "{{ $transactionInfo['id'] ?? '' }}";
+                    // Redirect ke halaman status yang akan memproses dan menampilkan hasil yang benar
+                    window.location.href =
+                        "{{ route('payment.success', ['order_id' => $transactionInfo['id'] ?? '']) }}";
                 });
-            }
-            const orderId = "{{ $transactionInfo['id'] ?? '' }}";
-            const paymentMethod = document.getElementById('payment-method')?.textContent.toLowerCase() || '';
-            const qrisLoader = document.getElementById('qris-loader');
-            let pollingInterval;
-
-            function checkQrisStatus() {
-                if (!orderId) {
-                    clearInterval(pollingInterval);
-                    return;
-                }
-
-                fetch(`/check-payment-status/${orderId}`, {
-                        method: 'GET',
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Accept': 'application/json'
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('Polling status:', data);
-                        if (data.status === 'success' && data.payment_details && data.payment_details
-                            .qris_url) {
-                            // QRIS ditemukan!
-                            clearInterval(pollingInterval); // Hentikan polling
-
-                            const instructionsDiv = document.getElementById('payment-instructions');
-                            instructionsDiv.innerHTML = `
-                                <p><strong>QRIS:</strong></p>
-                                <p>Silakan scan kode QR di bawah ini.</p>
-                                <img src="${data.payment_details.qris_url}" alt="QRIS Payment" class="qris-image">
-                            `;
-
-                        } else if (data.is_final) {
-                            // Jika status sudah final (lunas/gagal), hentikan polling
-                            clearInterval(pollingInterval);
-                            if (data.redirect_url) {
-                                window.location.href = data.redirect_url;
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error polling payment status:', error);
-                        clearInterval(pollingInterval); // Hentikan jika ada error jaringan
-                    });
-            }
-
-            // Mulai polling HANYA jika metode QRIS dan loader-nya ada
-            if (paymentMethod.includes('qris') && qrisLoader) {
-                // Polling setiap 3 detik, maksimal 10 kali (30 detik)
-                let maxAttempts = 10;
-                let currentAttempt = 0;
-
-                pollingInterval = setInterval(() => {
-                    currentAttempt++;
-                    if (currentAttempt > maxAttempts) {
-                        clearInterval(pollingInterval);
-                        qrisLoader.innerHTML =
-                            '<strong>Gagal memuat QRIS.</strong><br>Silakan coba refresh halaman.';
-                        return;
-                    }
-                    checkQrisStatus();
-                }, 3000);
             }
         });
     </script>

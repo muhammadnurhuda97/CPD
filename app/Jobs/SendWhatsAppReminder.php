@@ -7,10 +7,10 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use App\Services\WhatsAppNotificationService; // PENTING: Import Service
+use App\Services\WhatsAppNotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
-use App\Models\Transaction; // PENTING: Import model Transaction
+use App\Models\Transaction;
 
 class SendWhatsAppReminder implements ShouldQueue
 {
@@ -22,21 +22,9 @@ class SendWhatsAppReminder implements ShouldQueue
     protected $amount;
     protected $expiryTime;
     protected $orderId;
-    protected $notificationType; // 'pending_reminder_1', 'pending_reminder_2', 'expired', 'cancel_follow_up', etc.
-    protected $paymentDetails; // Detail pembayaran untuk pesan
+    protected $notificationType;
+    protected $paymentDetails;
 
-    /**
-     * Create a new job instance.
-     *
-     * @param string $whatsappNumber
-     * @param string $itemName
-     * @param string $itemType
-     * @param float $amount
-     * @param Carbon|null $expiryTime
-     * @param string $orderId
-     * @param string $notificationType
-     * @param array $paymentDetails
-     */
     public function __construct(string $whatsappNumber, string $itemName, string $itemType, float $amount, ?Carbon $expiryTime, string $orderId, string $notificationType, array $paymentDetails = [])
     {
         $this->whatsappNumber = $whatsappNumber;
@@ -49,51 +37,45 @@ class SendWhatsAppReminder implements ShouldQueue
         $this->paymentDetails = $paymentDetails;
     }
 
-    /**
-     * Execute the job.
-     *
-     * @param WhatsAppNotificationService $waService
-     * @return void
-     */
     public function handle(WhatsAppNotificationService $waService)
     {
-        Log::info("Executing SendWhatsAppReminder Job for orderId: {$this->orderId}, type: {$this->notificationType}");
+        Log::info("Menjalankan Job SendWhatsAppReminder untuk orderId: {$this->orderId}, tipe: {$this->notificationType}");
 
-        // PENTING: Cek status transaksi saat ini sebelum mengirim pengingat.
-        // Jika sudah lunas ('paid') atau sudah gagal secara definitif ('failed'), jangan kirim pengingat.
         $transaction = Transaction::where('order_id', $this->orderId)->first();
         if ($transaction && ($transaction->status === 'paid' || $transaction->status === 'failed')) {
-            Log::info("Skipping reminder for {$this->orderId} as status is no longer pending ({$transaction->status}).");
-            return; // Jangan kirim pengingat jika sudah bayar/gagal final
+            Log::info("Melewatkan pengingat untuk {$this->orderId} karena status bukan lagi pending ({$transaction->status}).");
+            return;
         }
-
-        // Format jumlah uang
         $formattedAmount = "Rp " . number_format($this->amount, 0, ',', '.');
+        $expiryTimeFormatted = $this->expiryTime ? $this->expiryTime->translatedFormat('l, d F Y H:i') . ' WIB' : 'Waktu tidak tersedia';
 
-        // Format waktu kadaluarsa jika tersedia
-        $expiryTimeFormatted = $this->expiryTime ? $this->expiryTime->translatedFormat('l, d F Y H.i') . ' WIB' : 'Waktu tidak tersedia';
-
-        // Menyusun detail pembayaran
         $paymentType = $this->paymentDetails['payment_type'] ?? 'transfer';
         $vaNumber = $this->paymentDetails['va_number'] ?? '-';
         $bank = $this->paymentDetails['bank'] ?? '-';
         $qrisContent = $this->paymentDetails['qris_content'] ?? null;
+        $billerCode = $this->paymentDetails['biller_code'] ?? null;
+        $billKey = $this->paymentDetails['bill_key'] ?? null;
+        $paymentCode = $this->paymentDetails['payment_code'] ?? null;
 
         $paymentDetailsMessage = "";
-        if ($paymentType === 'va_number' || $paymentType === 'bank_transfer') {
+        if (in_array($paymentType, ['bank_transfer', 'permata'])) {
             $paymentDetailsMessage = "Metode: *Transfer Virtual Account {$bank}*\nNomor VA: *{$vaNumber}*\n";
+        } elseif ($paymentType === 'echannel') {
+            $paymentDetailsMessage = "Metode: *Mandiri Bill Payment*\nKode Perusahaan: *{$billerCode}*\nKode Pembayaran: *{$billKey}*\n";
+        } elseif ($paymentType === 'cstore') {
+            $paymentDetailsMessage = "Metode: *Pembayaran Gerai*\nKode Pembayaran: *{$paymentCode}*\n";
         } elseif ($paymentType === 'qris') {
             $paymentDetailsMessage = "Metode: *QRIS*\n";
-            $paymentDetailsMessage .= "Silakan scan QRIS ini: " . ($qrisContent ? $qrisContent . "\n" : "[INSTRUKSI SCAN DI APLIKASI E-WALLET ANDA]\n");
+            $paymentDetailsMessage .= "Silakan scan QRIS pada halaman pembayaran Anda.\n";
         }
 
-        // Menentukan jenis pesan berdasarkan tipe notifikasi
+        $message = null;
         switch ($this->notificationType) {
             case 'pending_reminder_1':
-                $message = "🔔 Halo, ini pengingat pertama! Pembayaran Anda untuk *{$this->itemName}* ({$this->itemType}) sebesar *{$formattedAmount}* masih menunggu penyelesaian. \n\n{$paymentDetailsMessage}Batas waktu: *{$expiryTimeFormatted}*\n\nSegera selesaikan pembayaran untuk mengamankan pesanan/pendaftaran Anda. Terima kasih!";
+                $message = "🔔 Halo, ini pengingat pertama! Pembayaran Anda untuk produk *{$this->itemName}* sebesar *{$formattedAmount}* masih menunggu penyelesaian. \n\n{$paymentDetailsMessage}Batas waktu: *{$expiryTimeFormatted}*\n\nSegera selesaikan pembayaran untuk mengamankan pesanan Anda. Terima kasih!";
                 break;
             case 'pending_reminder_2':
-                $message = "🚨 Peringatan terakhir! Batas waktu pembayaran Anda untuk *{$this->itemName}* ({$this->itemType}) sebesar *{$formattedAmount}* akan segera berakhir. \n\n{$paymentDetailsMessage}Batas waktu: *{$expiryTimeFormatted}*\n\nSegera selesaikan sebelum kedaluwarsa! Jangan sampai kesempatan ini terlewat.";
+                $message = "🚨 Peringatan terakhir! Batas waktu pembayaran Anda untuk produk *{$this->itemName}* sebesar *{$formattedAmount}* akan segera berakhir. \n\n{$paymentDetailsMessage}Batas waktu: *{$expiryTimeFormatted}*\n\nSegera selesaikan sebelum kedaluwarsa!";
                 break;
             case 'expired':
                 $message = "❌ Pemberitahuan: Batas waktu pembayaran untuk *{$this->itemName}* ({$this->itemType}) sebesar *{$formattedAmount}* telah kadaluarsa. \n\nMohon maaf, pesanan/pendaftaran Anda dibatalkan. Jika Anda masih ingin melanjutkan, silakan lakukan pemesanan/pendaftaran ulang.";
@@ -101,10 +83,8 @@ class SendWhatsAppReminder implements ShouldQueue
             case 'cancel_follow_up':
                 $message = "Halo, kami melihat Anda membatalkan pembayaran untuk *{$this->itemName}* ({$this->itemType}) sebesar *{$formattedAmount}*. Apakah ada kendala? Kami siap membantu. Silakan coba lagi jika Anda berubah pikiran.";
                 break;
-                // Tambahkan case lain jika ada notifikasi follow-up untuk status 'deny' atau yang lain
         }
 
-        // Mengirim pesan jika ada
         if (!empty($message)) {
             $waService->sendToStarsender(['messageType' => 'text', 'to' => $this->whatsappNumber, 'body' => $message]);
         }

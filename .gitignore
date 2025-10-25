@@ -1,0 +1,28 @@
+# Laravel default ignores
+/vendor
+/node_modules
+/public/storage
+/storage/*.key
+.env
+.env.*
+.idea
+.vscode
+.DS_Store
+npm-debug.log
+yarn-error.log
+
+# File debug / tidak perlu
+bank
+bill_key
+biller_code
+id
+payment_code
+payment_status
+payment_type
+permata_va_number
+status
+test.php
+url
+user_id
+va_number
+waNotificationService

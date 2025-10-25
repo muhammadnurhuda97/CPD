@@ -11,20 +11,22 @@
             <div class="container">
                 <div class="page-inner">
                     <div class="page-header">
-                         @if(Auth::check() && Auth::user()->role === 'admin')
-                        <h4 class="page-title">Daftar Peserta</h4>
+                        @if (Auth::check() && Auth::user()->role === 'admin')
+                            <h4 class="page-title">Daftar Peserta</h4>
                         @elseif (Auth::check() && Auth::user()->role === 'user')
-                        <h4 class="page-title">My Lead</h4>
+                            <h4 class="page-title">My Lead</h4>
                         @endif
                         <ul class="breadcrumbs">
                             <li class="nav-home">
                                 <a href="#"><i class="icon-home"></i></a>
                             </li>
                             <li class="separator"><i class="icon-arrow-right"></i></li>
-                             @if(Auth::check() && Auth::user()->role === 'admin')
-                            <li class="nav-item"><a href="#">Peserta</a></li>
+                            @if (Auth::check() && Auth::user()->role === 'admin')
+                                <li class="nav-item"><a href="#">Peserta</a></li>
                             @elseif (Auth::check() && Auth::user()->role === 'user')
-                            <li class="nav-item"><a href="#">{{ Request::is('lead-workshop') ? 'My Lead Workshop' : 'My Lead Webinar' }}</a></li>
+                                <li class="nav-item"><a
+                                        href="#">{{ Request::is('lead-workshop') ? 'My Lead Workshop' : 'My Lead Webinar' }}</a>
+                                </li>
                             @endif
                         </ul>
                     </div>
@@ -34,7 +36,9 @@
                                 <div class="card">
                                     <div class="card-header">
                                         <div class="d-flex align-items-center w-100">
-                                            <h4 class="card-title me-auto">{{ Request::is('lead-workshop') ? 'Daftar Lead Workshop' : 'Daftar Lead Webinar' }}</h4>
+                                            <h4 class="card-title me-auto">
+                                                {{ Request::is('lead-workshop') ? 'Daftar Lead Workshop' : 'Daftar Lead Webinar' }}
+                                            </h4>
 
                                             <!-- Form pencarian -->
                                             <form method="GET"
@@ -70,15 +74,23 @@
                                                 <div class="dropdown-menu dropdown-menu-end"
                                                     aria-labelledby="dropdownMenuButton">
                                                     @php
+                                                        // Ambil semua parameter query yang ada
+                                                        $queryParams = request()->except('perPage');
+
                                                         if (request()->routeIs('members.index')) {
-                                                            $exportRoute = route('export.csv', ['type' => 'webinar']);
+                                                            $exportRoute = route(
+                                                                'export.csv',
+                                                                array_merge($queryParams, ['type' => 'webinar']),
+                                                            );
                                                         } elseif (request()->routeIs('members.workshop')) {
-                                                            $exportRoute = route('export.csv', ['type' => 'workshop']);
+                                                            $exportRoute = route(
+                                                                'export.csv',
+                                                                array_merge($queryParams, ['type' => 'workshop']),
+                                                            );
                                                         } else {
                                                             $exportRoute = route('users.csv');
                                                         }
                                                     @endphp
-
                                                     <a class="dropdown-item" href="{{ $exportRoute }}">Export CSV</a>
                                                     <a class="dropdown-item" href="#">Print PDF</a>
                                                 </div>
@@ -115,7 +127,7 @@
                                                             <td>{{ $member->whatsapp }}</td>
                                                             <td>{{ $member->city }}</td>
                                                             <td>{{ $member->business }}</td>
-                                                            <td>{{ $member->affiliate_id }}</td>
+                                                            <td>{{ $member->affiliate_username }}</td>
                                                             <td>
                                                                 <!-- Delete button -->
                                                                 <form id="deleteForm_{{ $member->id }}"

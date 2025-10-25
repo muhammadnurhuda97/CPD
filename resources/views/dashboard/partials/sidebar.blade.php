@@ -67,7 +67,7 @@
                              </li>
                              @if (Auth::check() && Auth::user()->role === 'admin')
                                  <li>
-                                     <a href="{{ route('notifikasi.index') }}">
+                                     <a href="{{ route('notifikasi.event') }}">
                                          <span class="sub-item">Funnel Event</span>
                                      </a>
                                  </li>

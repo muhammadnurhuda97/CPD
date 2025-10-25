@@ -19,21 +19,29 @@ class NotificationController extends Controller
         return view('dashboard.notifikasi.index', compact('notifications'));
     }
 
+    public function funnel()
+    {
+        $notifications = Notification::latest()->get();
+        // Method baru ini HANYA mengembalikan view untuk funnel
+        return view('dashboard.notifikasi.event', compact('notifications'));
+    }
+
+
     // Menampilkan form untuk membuat notifikasi
     public function store(Request $request)
     {
         // Validasi input form
-        // dd($request->all());
         $validated = $request->validate([
             'event_type' => 'required|string',
             'event' => 'required|string',
+            'event_city' => 'nullable|required_if:event_type,workshop|string|max:255', // BARU: Validasi untuk event_city
             'event_date' => 'required|date',
             'event_time' => 'required|date_format:H:i',
-            'zoom' => 'nullable|required_if:event_type,webinar|url',  // hanya wajib jika webinar
-            'location' => 'nullable|required_if:event_type,workshop|url',  // hanya wajib jika workshop
-            'location_name' => 'nullable|required_if:event_type,workshop|string',  // hanya wajib jika workshop
+            'zoom' => 'nullable|required_if:event_type,webinar|url',
+            'location' => 'nullable|required_if:event_type,workshop|url',
+            'location_name' => 'nullable|required_if:event_type,workshop|string',
             'location_address' => 'nullable|required_if:event_type,workshop|string',
-            'price' => 'nullable|required_if:is_paid,1|numeric|min:0', // harga wajib jika event berbayar
+            'price' => 'nullable|required_if:is_paid,1|numeric|min:0',
             'banner' => 'required|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
@@ -42,25 +50,26 @@ class NotificationController extends Controller
         } else {
             $bannerPath = null;
         }
+
         // Menyimpan data notifikasi
         $notification = new Notification();
-        $notification->user_id = auth()->user()->id;  // Menyimpan ID pengguna yang sedang login
+        $notification->user_id = auth()->user()->id;
         $notification->event_type = $validated['event_type'];
         $notification->event = $validated['event'];
+        $notification->event_city = $validated['event_city'] ?? null; // BARU: Simpan event_city
         $notification->event_date = $validated['event_date'];
         $notification->event_time = $validated['event_time'];
-        $notification->banner = $bannerPath; // Menyimpan path banner
-        $notification->zoom = $validated['zoom'] ?? null;  // Jika zoom null, simpan null
-        $notification->location = $validated['location'] ?? null;  // Jika location null, simpan null
-        $notification->location_name = $validated['location_name'] ?? null;  // Jika location null, simpan null
-        $notification->location_address = $validated['location_address'] ?? null;  // Jika location null, simpan null
-        $notification->is_paid = $request->has('is_paid') ? 1 : 0; // Menyimpan apakah event berbayar
-        $notification->price = $request->is_paid == 1 ? $validated['price'] : null; // Menyimpan harga jika event berbayar
+        $notification->banner = $bannerPath;
+        $notification->zoom = $validated['zoom'] ?? null;
+        $notification->location = $validated['location'] ?? null;
+        $notification->location_name = $validated['location_name'] ?? null;
+        $notification->location_address = $validated['location_address'] ?? null;
+        $notification->is_paid = $request->has('is_paid') ? 1 : 0;
+        $notification->price = $request->is_paid == 1 ? $validated['price'] : null;
         $notification->save();
 
         return redirect()->route('notifikasi.index')->with('success', 'Notifikasi berhasil ditambahkan.');
     }
-
 
     // Menampilkan form edit untuk notifikasi
     public function edit($id)
@@ -70,15 +79,17 @@ class NotificationController extends Controller
     }
 
     // Mengupdate data notifikasi
-     public function update(Request $request, $id)
+    public function update(Request $request, $id)
     {
-        // dd($request->all());
         $rules = [
+            'event' => 'required|string|max:255',
             'event_date' => 'required|date',
             'event_time' => 'required|date_format:H:i',
-            // Banner tidak wajib, tapi kalau diupload harus valid image
             'banner' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ];
+
+        // BARU: Tambahkan aturan validasi untuk event_city
+        $rules['event_city'] = 'nullable|required_if:event_type,workshop|string|max:255';
 
         if ($request->event_type === 'webinar') {
             $rules['zoom'] = 'required|url';
@@ -97,9 +108,13 @@ class NotificationController extends Controller
         $validated = $request->validate($rules);
 
         $notification = Notification::findOrFail($id);
+        $notification->event = $validated['event'];
 
         $notification->event_date = $validated['event_date'];
         $notification->event_time = $validated['event_time'];
+
+        // BARU: Simpan event_city
+        $notification->event_city = $validated['event_city'] ?? null;
 
         $notification->zoom = $request->event_type === 'webinar' ? $validated['zoom'] : null;
         $notification->location = $request->event_type === 'workshop' ? $validated['location'] : null;

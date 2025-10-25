@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 
 use App\Models\Product;
-use App\Models\Notification;
+use App\Models\Notification; // Pastikan model Notification di-import
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\VisitorController;
@@ -47,26 +47,30 @@ Route::get('/', function () {
     return view('auth.login');
 });
 
-// Landing page webinar & workshop
-Route::get('/webinar-autosmart-marketing', [WebinarController::class, 'index'])->name('webinar.index');
-Route::get('/workshop-autosmart-marketing', [WorkshopController::class, 'index'])->name('workshop.index');
+// DIUBAH: Rute landing page sekarang menerima model Notifikasi berdasarkan ID-nya
+Route::get('/webinar_id={notification}', [WebinarController::class, 'index'])->name('webinar.index');
+Route::get('/workshop_id={notification}', [WorkshopController::class, 'index'])->name('workshop.index');
 
-// Registrasi event
-Route::get('/registrasi-webinar', function () {
+// DIUBAH: Rute form pendaftaran sekarang menerima model Notifikasi berdasarkan ID-nya
+Route::get('/registrasi/webinar_id={notification}', function (Notification $notification) {
     (new VisitorController)->logVisitor();
-    $notification = Notification::where('event_type', 'webinar')->latest()->first();
-    abort_if(!$notification, 404, 'Halaman webinar tidak tersedia saat ini.');
-    return view('participants.form', compact('notification'))->with('event_type', 'webinar');
+    // Pastikan hanya event dengan tipe 'webinar' yang bisa diakses melalui rute ini
+    abort_if($notification->event_type !== 'webinar', 404, 'Halaman webinar tidak tersedia.');
+    return view('participants.form', compact('notification'));
 })->name('webinar.form');
 
-Route::get('/registrasi-workshop', function () {
-    $notification = Notification::where('event_type', 'workshop')->latest()->first();
-    abort_if(!$notification, 404, 'Workshop tidak tersedia saat ini.');
+Route::get('/registrasi/workshop_id={notification}', function (Notification $notification) {
+    // Pastikan hanya event dengan tipe 'workshop' yang bisa diakses melalui rute ini
+    abort_if($notification->event_type !== 'workshop', 404, 'Halaman workshop tidak tersedia.');
     if ($notification->is_paid) {
         session()->flash('warning', 'Workshop ini berbayar. Silakan siapkan pembayaran sebesar Rp ' . number_format($notification->price, 0, ',', '.'));
     }
-    return view('participants.workshop', compact('notification'))->with('event_type', 'workshop');
+    return view('participants.workshop', compact('notification'));
 })->name('workshop.form');
+
+// Rute untuk mengupdate kuota, dipindahkan ke area publik
+Route::post('/update-kuota', [VisitorController::class, 'updateQuota'])->name('update.kuota'); //
+
 
 // Detail produk (publik)
 Route::get('/produk/{slug}', [ProductController::class, 'show'])->name('products.detail');
@@ -80,15 +84,16 @@ Route::get('/link-zoom', fn() => view('link-zoom'));
 // ==============================
 // PAYMENT ROUTES
 // ==============================
-Route::get('/payment/{type}/{identifier}', [PaymentController::class, 'initiatePayment'])->name('payment.initiate');
-Route::get('/payment-success', [PaymentController::class, 'paymentSuccess'])->name('payment.success');
-Route::get('/payment-error', [PaymentController::class, 'paymentError'])->name('payment.error');
-Route::get('/check-payment-status/{orderId}', [PaymentController::class, 'checkPaymentStatus'])->name('payment.checkStatus');
-Route::post('/payment/cancel/{orderId}', [PaymentController::class, 'cancelAndRetry'])->name('payment.cancel');
+Route::get('/payment/initiate/{type}/{identifier}', [PaymentController::class, 'initiatePayment'])->name('payment.initiate');
+Route::get('/payment/success', [PaymentController::class, 'paymentSuccess'])->name('payment.success');
+Route::get('/payment/check-status/{orderId}', [PaymentController::class, 'checkPaymentStatus'])->name('payment.checkStatus');
+Route::get('/payment/error', [PaymentController::class, 'paymentErrorPage'])->name('payment.error.page');
+Route::get('/payment/cancel/{orderId}', [PaymentController::class, 'cancelAndRetry'])->name('payment.cancel');
+
 
 // Webhook Midtrans
 Route::post('/webhook/midtrans', [PaymentController::class, 'handleMidtransCallback'])
-    ->middleware('verify.midtrans.ip')
+    // ->middleware('verify.midtrans.ip')
     ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
 
 // ==============================
@@ -123,11 +128,9 @@ Route::middleware('auth')->group(function () {
         return redirect($intendedUrl)->with('success', 'Profil Anda lengkap. Silakan lanjutkan.');
     })->name('check.profile.completion');
 
-    // Kuota
-    Route::post('/update-kuota', [VisitorController::class, 'updateQuota'])->name('update.kuota');
-
     // Notifikasi & Leads
     Route::get('/event-pendaftaran', [NotificationController::class, 'index'])->name('notifikasi.index');
+    Route::get('/funnel-pendaftaran', [NotificationController::class, 'funnel'])->name('notifikasi.event');
     Route::get('/lead-webinar', [MemberController::class, 'index'])->name('members.index');
     Route::get('/lead-workshop', [MemberController::class, 'indexWorkshop'])->name('members.workshop');
     Route::get('/member', [MemberController::class, 'indexMember'])->name('members.member');
@@ -142,8 +145,17 @@ Route::middleware('auth')->group(function () {
         abort_unless(File::exists($path), 404);
         return response()->download($path);
     })->where('filename', '.*');
+
+    Route::get('/export-csv', [MemberController::class, 'exportCSV'])->name('export.csv');
 });
 
+
+Route::get('/get-copywriting', function (Request $request) {
+    $target = $request->query('target');
+    abort_unless(preg_match('/^flyer\d+\.txt$/', $target), 403);
+    $path = storage_path('app/public/copywriting/' . $target);
+    return response(File::exists($path) ? File::get($path) : '', 200)->header('Content-Type', 'text/plain');
+});
 // ==============================
 // ADMIN ROUTES
 // ==============================
@@ -169,7 +181,6 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::delete('/member/{id}', [MemberController::class, 'delete'])->name('members.delete');
     Route::delete('/lead-webinar/{id}', [MemberController::class, 'destroy'])->name('admin.members.destroy.webinar');
     Route::delete('/lead-workshop/{id}', [MemberController::class, 'destroy'])->name('admin.members.destroy.workshop');
-    Route::get('/export-csv', [MemberController::class, 'exportCSV'])->name('export.csv');
     Route::get('/export-members', [MemberController::class, 'exportUsersCSV'])->name('users.csv');
 
     // Upload flyer dan copywriting
@@ -203,13 +214,6 @@ Route::middleware(['auth', 'admin'])->group(function () {
         }
 
         return response()->json(['success' => true, 'new_image_url' => asset('storage/images/flyer/' . $filename)]);
-    });
-
-    Route::get('/get-copywriting', function (Request $request) {
-        $target = $request->query('target');
-        abort_unless(preg_match('/^flyer\d+\.txt$/', $target), 403);
-        $path = storage_path('app/public/copywriting/' . $target);
-        return response(File::exists($path) ? File::get($path) : '', 200)->header('Content-Type', 'text/plain');
     });
 
     Route::post('/save-copywriting', function (Request $request) {

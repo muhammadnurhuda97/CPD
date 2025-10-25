@@ -192,25 +192,37 @@
     <script>
         $(document).ready(function() {
             $('#basic-datatables').DataTable({
+                // Mengatur pengurutan awal berdasarkan kolom 'Tanggal' (kolom pertama)
                 "order": [
                     [0, "desc"]
                 ],
+                // Aktifkan fitur dasar
                 "paging": true,
                 "searching": true,
-                "info": true
+                "info": true,
+                // Pastikan DataTables mengerti format tanggal (opsional jika perlu)
+                "columnDefs": [{
+                    "targets": 0,
+                    "type": "date" // pastikan DataTables tahu bahwa kolom ini adalah tanggal
+                }]
             });
 
+            // Dropdown filter (jika digunakan)
             $('#filterType').on('change', function() {
                 var selectedType = $(this).val();
                 var currentUrl = new URL(window.location.href);
+
                 currentUrl.searchParams.delete('page');
+
                 if (selectedType) {
                     currentUrl.searchParams.set('type', selectedType);
                 } else {
                     currentUrl.searchParams.delete('type');
                 }
+
                 window.location.href = currentUrl.toString();
             });
         });
     </script>
+
 @endsection

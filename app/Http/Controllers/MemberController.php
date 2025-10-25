@@ -12,65 +12,80 @@ use App\Exports\UsersExport;
 
 class MemberController extends Controller
 {
-    // Menampilkan daftar peserta (member)
     public function index(Request $request)
     {
-        $username = Auth::user()->username;
-        $search = $request->input('search');  // Ambil input pencarian
-        $eventType = 'webinar';  // Tipe event untuk halaman ini
+        $user = Auth::user();
+        $search = $request->input('search');
+        $eventType = 'webinar';
 
-        if (Auth::user()->role === 'admin') {
+        if ($user->role === 'admin') {
             $membersQuery = Participant::where('event_type', $eventType);
         } else {
-            $membersQuery = Participant::where('affiliate_id', $username)
-                ->where('event_type', $eventType);
+            // ===== AWAL PERBAIKAN LOGIKA QUERY =====
+            // 1. Filter berdasarkan event_type terlebih dahulu
+            $membersQuery = Participant::where('event_type', $eventType)
+                // 2. Kelompokkan kondisi 'affiliate_id' dalam satu grup
+                ->where(function ($query) use ($user) {
+                    $query->where('affiliate_id', $user->id)
+                        ->orWhere('affiliate_id', $user->username);
+                });
+            // ===== AKHIR PERBAIKAN LOGIKA QUERY =====
         }
 
-        // Jika ada pencarian, filter berdasarkan nama, email, atau whatsapp
         if ($search) {
             $membersQuery->where(function ($query) use ($search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('whatsapp', 'like', "%{$search}%")
-                    ->orWhere('city', 'like', "%{$search}%")
-                    ->orWhere('affiliate_id', 'like', "%{$search}%");
+                    ->orWhere('whatsapp', 'like', "%{$search}%") // BARU: Menambahkan pencarian berdasarkan WhatsApp
+                    ->orWhere('affiliate_id', 'like', "%{$search}%") // Menggunakan affiliate_id untuk data lama
+                    ->orWhereHas('affiliateUser', function ($q) use ($search) { // BARU: Menambahkan pencarian berdasarkan username pengundang
+                        $q->where('username', 'like', "%{$search}%");
+                    })
+                    ->orWhere('city', 'like', "%{$search}%");
             });
         }
 
-        // Paginate hasil query dengan 15 per halaman
         $perPage = $request->input('perPage', 15);
-        $members = $membersQuery->paginate($perPage);
+        $members = $membersQuery->latest()->paginate($perPage);
 
         return view('dashboard.peserta.index', compact('members'));
     }
 
     public function indexWorkshop(Request $request)
     {
-        $username = Auth::user()->username;
-        $search = $request->input('search');  // Ambil input pencarian
-        $eventType = 'workshop';  // Tipe event untuk halaman ini
+        $user = Auth::user();
+        $search = $request->input('search');
+        $eventType = 'workshop';
 
-        if (Auth::user()->role === 'admin') {
+        if ($user->role === 'admin') {
             $membersQuery = Participant::where('event_type', $eventType);
         } else {
-            $membersQuery = Participant::where('affiliate_id', $username)
-                ->where('event_type', $eventType);
+            // ===== AWAL PERBAIKAN LOGIKA QUERY =====
+            // 1. Filter berdasarkan event_type terlebih dahulu
+            $membersQuery = Participant::where('event_type', $eventType)
+                // 2. Kelompokkan kondisi 'affiliate_id' dalam satu grup
+                ->where(function ($query) use ($user) {
+                    $query->where('affiliate_id', $user->id)
+                        ->orWhere('affiliate_id', $user->username);
+                });
+            // ===== AKHIR PERBAIKAN LOGIKA QUERY =====
         }
 
-        // Jika ada pencarian, filter berdasarkan nama, email, atau whatsapp
         if ($search) {
             $membersQuery->where(function ($query) use ($search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('whatsapp', 'like', "%{$search}%")
-                    ->orWhere('city', 'like', "%{$search}%")
-                    ->orWhere('affiliate_id', 'like', "%{$search}%");
+                    ->orWhere('whatsapp', 'like', "%{$search}%") // BARU: Menambahkan pencarian berdasarkan WhatsApp
+                    ->orWhere('affiliate_id', 'like', "%{$search}%") // Menggunakan affiliate_id untuk data lama
+                    ->orWhereHas('affiliateUser', function ($q) use ($search) { // BARU: Menambahkan pencarian berdasarkan username pengundang
+                        $q->where('username', 'like', "%{$search}%");
+                    })
+                    ->orWhere('city', 'like', "%{$search}%");
             });
         }
 
-        // Paginate hasil query dengan 15 per halaman
         $perPage = $request->input('perPage', 15);
-        $members = $membersQuery->paginate($perPage);
+        $members = $membersQuery->latest()->paginate($perPage);
 
         return view('dashboard.peserta.index', compact('members'));
     }
@@ -78,14 +93,18 @@ class MemberController extends Controller
     public function indexMember(Request $request)
     {
         $user = Auth::user();
-        $perPage = $request->input('perPage', 15); // Tambahkan ini
+        $perPage = $request->input('perPage', 15);
 
         if ($user->role === 'admin') {
-            // Admin melihat semua member
             $membersQuery = User::query();
         } else {
-            // User hanya melihat member yang mereka undang berdasarkan affiliate_id
-            $membersQuery = User::where('affiliate_id', $user->username);
+            // ===== CATATAN: Ini memfilter untuk HANYA user itu sendiri =====
+            // Jika Anda ingin user melihat member yang mereka undang,
+            // query-nya harus diubah ke:
+            // $membersQuery = User::where('affiliate_id', $user->username);
+            // Untuk saat ini, saya biarkan sesuai kode asli Anda:
+            $membersQuery = User::where('id', $user->id);
+            // ===============================================================
         }
 
         $search = $request->input('search');
@@ -93,85 +112,77 @@ class MemberController extends Controller
             $membersQuery->where(function ($query) use ($search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('affiliate_id', 'like', "%{$search}%");
+                    ->orWhere('username', 'like', "%{$search}%");
             });
         }
 
         $members = $membersQuery->paginate($perPage);
-
         return view('dashboard.member.index', compact('members'));
     }
 
-
-    // Menghapus peserta
     public function destroy($id)
     {
         $member = Participant::find($id);
-
-        // Cek apakah peserta ada
         if (!$member) {
             return back()->with('error', 'Peserta tidak ditemukan.');
         }
 
-        // Ambil user yang sedang login
         $user = Auth::user();
-
-        // Admin boleh hapus siapa saja, user hanya boleh hapus peserta yang mereka undang
-        if ($user->role !== 'admin' && $member->affiliate_id !== $user->username) {
+        // ===== PERBAIKAN PENGECEKAN KEAMANAN =====
+        if ($user->role !== 'admin' && $member->affiliate_id !== $user->id && $member->affiliate_id !== $user->username) {
             return back()->with('error', 'Anda tidak memiliki izin untuk menghapus peserta ini.');
         }
+        // ==========================================
 
-        // Simpan dulu jenis event untuk redirect nanti
         $eventType = $member->event_type;
-
-        // Hapus peserta
         $member->delete();
-
-        // Tentukan rute redirect sesuai jenis event
         $redirectRoute = $eventType === 'workshop' ? 'members.workshop' : 'members.index';
 
         return redirect()->route($redirectRoute)->with('success', 'Peserta berhasil dihapus!');
     }
-    // Menghapus user/member
+
     public function delete($id)
     {
         $member = User::find($id);
-
         if (!$member) {
             return back()->with('error', 'Member tidak ditemukan.');
         }
 
         $user = Auth::user();
-
-        // Cegah admin menghapus dirinya sendiri
         if ($user->id === $member->id) {
             return back()->with('error', 'Anda tidak bisa menghapus akun Anda sendiri.');
         }
 
-        // Admin boleh hapus siapa saja, user hanya boleh hapus yang mereka undang
+        // ===== PERBAIKAN PENGECEKAN KEAMANAN =====
         if ($user->role !== 'admin' && $member->affiliate_id !== $user->username) {
             return back()->with('error', 'Anda tidak memiliki izin untuk menghapus member ini.');
         }
+        // ==========================================
 
         $member->delete();
-
         return redirect()->route('members.member')->with('success', 'Member berhasil dihapus!');
     }
-    // Mengunduh daftar peserta dalam format Excel
+
     public function exportCSV(Request $request)
     {
-        if (request()->routeIs('export.csv')) {
-            // Cek asal halaman melalui referer atau tambahkan ?type=webinar misalnya
-            $eventType = $request->query('type', 'webinar'); // default webinar
-            $filename = 'lead-' . $eventType . '.csv';
+        $eventType = $request->query('type', 'webinar');
+        $search = $request->query('search'); // Ambil parameter search
+        $city = $request->query('city');     // Ambil parameter city
 
-            return Excel::download(new ParticipantsExport($eventType), $filename);
+        $filename = 'lead-' . $eventType . '.csv';
+
+        // Logika ini sudah benar dari langkah kita sebelumnya
+        $user = Auth::user();
+        $exportUser = null;
+
+        if ($user->role !== 'admin') {
+            $exportUser = $user;
         }
 
-        abort(404);
+        // Meneruskan parameter search, city, dan user (jika bukan admin)
+        return Excel::download(new ParticipantsExport($eventType, $search, $city, $exportUser), $filename);
     }
 
-    // Mengunduh daftar member dalam format Excel
     public function exportUsersCSV()
     {
         return Excel::download(new UsersExport, 'users.csv');

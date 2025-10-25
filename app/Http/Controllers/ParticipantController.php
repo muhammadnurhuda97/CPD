@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use App\Models\Participant;
 use App\Models\Notification;
 use App\Services\WhatsAppNotificationService;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
+use App\Models\User;
+use App\Jobs\CheckPaymentStatusAndNotify;
 
 class ParticipantController extends Controller
 {
@@ -14,23 +17,43 @@ class ParticipantController extends Controller
     {
         Log::info('ParticipantController@store: Request received', $request->except('password', '_token'));
 
-        // Normalisasi nomor WhatsApp (hapus semua selain angka)
-        $whatsapp = preg_replace('/\D/', '', $request->input('whatsapp'));
+        $notificationId = $request->input('notification_id');
+        $notification = Notification::find($notificationId);
 
-        // Ganti prefix '62' dengan '0' untuk nomor WA lokal Indonesia
+        if ($notification) {
+            Log::info("===== TIME CHECK START =====");
+            $now = Carbon::now('Asia/Jakarta');
+            Log::info("1. Waktu Server Saat Ini (WIB): " . $now->toDateTimeString());
+
+            $eventDateTime = Carbon::parse($notification->event_date . ' ' . $notification->event_time, 'Asia/Jakarta');
+            Log::info("2. Waktu Event dari DB: " . $eventDateTime->toDateTimeString());
+
+            $registrationCloseTime = $eventDateTime->copy()->subMinutes(30);
+            Log::info("3. Batas Waktu Pendaftaran Dihitung: " . $registrationCloseTime->toDateTimeString());
+
+            if ($now->greaterThanOrEqualTo($registrationCloseTime)) {
+                $isPastEvent = $now->greaterThanOrEqualTo($eventDateTime);
+                $errorMessage = $isPastEvent ? 'Event ini telah berakhir.' : 'Pendaftaran untuk event ini sudah ditutup.';
+
+                Log::error("4. KEPUTUSAN: PENDAFTARAN DITOLAK. Alasan: " . $errorMessage);
+                Log::info("===== TIME CHECK END =====");
+
+                return redirect()->back()
+                    ->withErrors(['event_expired' => $errorMessage . ' Untuk info lebih lanjut silakan hubungi admin.'])
+                    ->withInput();
+            }
+            Log::info("4. KEPUTUSAN: PENDAFTARAN DITERIMA. Waktu pendaftaran masih valid.");
+            Log::info("===== TIME CHECK END =====");
+        }
+
+        $whatsapp = preg_replace('/\D/', '', $request->input('whatsapp'));
         if (substr($whatsapp, 0, 2) === '62') {
             $whatsapp = '0' . substr($whatsapp, 2);
         }
-
         $request->merge(['whatsapp' => $whatsapp]);
 
-        Log::info('ParticipantController@store: WhatsApp number normalized', ['normalized_whatsapp' => $whatsapp]);
-
-        $eventType = $request->input('event_type');
-
-        // Cek apakah sudah ada peserta dengan WA & event_type yang sama
         $existingParticipant = Participant::where('whatsapp', $whatsapp)
-            ->where('event_type', $eventType)
+            ->where('notification_id', $notificationId)
             ->first();
 
         if ($existingParticipant) {
@@ -39,83 +62,63 @@ class ParticipantController extends Controller
                     ->withErrors(['whatsapp' => 'Nomor WhatsApp ini sudah terdaftar dan lunas untuk event ini.'])
                     ->withInput();
             }
-
-            Log::info("Existing unpaid/pending participant found for WA {$whatsapp}. Redirecting to payment.", ['participant_id' => $existingParticipant->id]);
-
-            $notification = Notification::where('event_type', $eventType)->latest()->first();
-            $price = $notification ? $notification->price : 0;
-
             if ($notification && $notification->is_paid) {
                 return redirect()->route('payment.initiate', [
                     'type' => 'event',
                     'identifier' => $existingParticipant->id,
-                    'price' => $price,
+                    'price' => $notification->price,
                 ]);
-            } else {
-                return redirect()->back()->with('success', 'Anda sudah terdaftar pada event gratis ini!');
             }
         }
 
-        // Validasi input
         $request->validate([
-            'name'        => 'required|string|max:255',
-            'business'    => 'required|string|max:255',
-            'email'       => 'required|email:rfc,dns|max:255',
-            'whatsapp'    => 'required|string|max:20|unique:participants,whatsapp,NULL,id,event_type,' . $eventType,
-            'city'        => 'required|string|max:255',
-            'event_type'  => 'required|string|in:webinar,workshop',
-        ], [
-            'whatsapp.unique' => 'Nomor WhatsApp ini sudah terdaftar untuk event ini!',
-            'email.email'     => 'Format email Anda sepertinya salah. Pastikan menggunakan format yang benar (contoh: nama@domain.com).',
-            'email.required'  => 'Email wajib diisi.',
-            'name.required'   => 'Nama lengkap wajib diisi.',
-            'business.required' => 'Nama bisnis/usaha wajib diisi.',
-            'whatsapp.required' => 'Nomor WhatsApp wajib diisi.',
-            'city.required'   => 'Kota asal wajib diisi.',
+            'name' => 'required|string|max:255',
+            'business' => 'required|string|max:255',
+            'email' => 'required|email:rfc,dns|max:255',
+            'whatsapp' => 'required|string|max:20',
+            'city' => 'required|string|max:255',
+            'event_type' => 'required|string|in:webinar,workshop',
+            'notification_id' => 'required|exists:notifications,id',
         ]);
 
-        Log::info('ParticipantController@store: Validation successful');
+        $affiliateUsername = $request->input('affiliate_id');
+        $affiliate = User::where('username', $affiliateUsername)->first();
+        $affiliateId = $affiliate ? $affiliate->id : User::where('username', 'admin')->first()->id;
 
-        $affiliateId = $request->input('affiliate_id', 'admin');
-
-        $notification = Notification::where('event_type', $eventType)->latest()->first();
-        $isPaidEvent = $notification && $notification->is_paid;
-        $price = $notification ? $notification->price : 0;
-
-        // Simpan data peserta baru
         $participant = Participant::create([
-            'name'           => $request->input('name'),
-            'business'       => $request->input('business'),
-            'email'          => $request->input('email'),
-            'whatsapp'       => $whatsapp,
-            'city'           => $request->input('city'),
-            'event_type'     => $eventType,
-            'affiliate_id'   => $affiliateId,
+            'name' => $request->input('name'),
+            'business' => $request->input('business'),
+            'email' => $request->input('email'),
+            'whatsapp' => $whatsapp,
+            'city' => $request->input('city'),
+            'event_type' => $request->input('event_type'),
+            'affiliate_id' => $affiliateId,
+            'notification_id' => $notificationId,
             'payment_status' => 'unpaid',
-            'is_paid'        => 0,
+            'is_paid' => 0,
         ]);
 
         Log::info('ParticipantController@store: Participant created successfully', ['participant_id' => $participant->id]);
+        $waService->sendPostEventMessage($participant);
 
-        if ($isPaidEvent) {
-            Log::info("ParticipantController@store: Paid event '{$eventType}' detected. Redirecting to payment.", ['participant_id' => $participant->id, 'price' => $price]);
-
+        if ($notification->is_paid) {
+            CheckPaymentStatusAndNotify::dispatch($participant->id)->delay(now()->addMinutes(5));
+            Log::info("Job CheckPaymentStatusAndNotify dikirimkan untuk ID peserta: {$participant->id} untuk dijalankan dalam 5 menit.");
             return redirect()->route('payment.initiate', [
                 'type' => 'event',
                 'identifier' => $participant->id,
-                'price' => $price,
+                'price' => $notification->price,
             ]);
+        } else {
+            $waService->sendPaidConfirmation($participant);
+            $waService->sendAdminNotification($participant, $request->input('event_type'));
+
+            $adminUser = User::where('username', 'admin')->first();
+            if ($adminUser && $affiliateId !== $adminUser->id) {
+                $waService->sendAffiliateNotification($affiliateId, $participant, $request->input('event_type'));
+            }
+
+            return redirect()->back()->with('success', 'Selamat Anda berhasil mendaftar!');
         }
-
-        // Event gratis: kirim notifikasi WA dan tampilkan pesan sukses
-        Log::info('ParticipantController@store: Free event detected. Sending notifications.', ['participant_id' => $participant->id]);
-
-        $waService->sendToParticipant($participant, $affiliateId);
-        $waService->sendAdminNotification($participant, $eventType);
-        if ($affiliateId !== 'admin') {
-            $waService->sendAffiliateNotification($affiliateId, $participant, $eventType);
-        }
-
-        return redirect()->back()->with('success', 'Selamat Anda berhasil mendaftar!');
     }
 }

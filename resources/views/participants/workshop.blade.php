@@ -1,8 +1,9 @@
 {{-- resources/views/participants/workshop.blade.php --}}
 @php
+    // DIHAPUS: Blok kode ini tidak lagi diperlukan.
+    // Variabel $notification dikirim langsung dari Rute.
     use Carbon\Carbon;
     \Carbon\Carbon::setLocale('id');
-
 @endphp
 
 <head>
@@ -20,7 +21,7 @@
         <div class="card">
             <div class="formbold-form-wrapper">
                 <div class="formbold-event-wrapper">
-                    <span>WORKSHOP</span>
+                    <span>{{ strtoupper($notification->event_type) }}</span>
 
                     <h3>{{ $notification ? $notification->event : 'Workshop Digital Marketing Autosmart' }}</h3>
                     <img src="{{ asset('storage/' . $notification->banner) }}" style="width: 100%;" alt="Banner">
@@ -45,7 +46,6 @@
                     </div>
                 </div>
 
-                <!-- Form Registrasi -->
                 <form method="POST" action="{{ route('participants.store') }}" id="registrationForm" novalidate>
                     @csrf
                     <h4 class="formbold-form-title">Register now</h4>
@@ -77,14 +77,16 @@
                         </div>
                     </div>
 
+                    {{-- DIUBAH: Field 'Kota Asal' sekarang tersembunyi dan nilainya diambil dari database --}}
                     <div>
-                        <label for="city" class="formbold-form-label">Kota Asal <span>*</span></label>
-                        <input type="text" name="city" id="city" class="formbold-form-input"
-                            value="{{ old('city') }}" required placeholder="Gresik, Jawa Timur" />
+                        <input type="hidden" name="city" id="city" class="formbold-form-input"
+                            value="{{ $notification->event_city }}" />
                     </div>
 
+                    {{-- DIUBAH: Menambahkan input tersembunyi untuk ID notifikasi dan mengisi event_type secara dinamis --}}
+                    <input type="hidden" name="notification_id" value="{{ $notification->id }}">
                     <input type="hidden" name="affiliate_id" value="{{ session('affiliate_id') }}">
-                    <input type="hidden" name="event_type" value="{{ $event_type }}">
+                    <input type="hidden" name="event_type" value="{{ $notification->event_type }}">
 
                     <p class="formbold-policy">
                         Dengan mengisi formulir ini dan mengklik kirim, Anda menyetujui <a href="#">kebijakan
@@ -96,7 +98,6 @@
                     </button>
                 </form>
 
-                <!-- Error Handling with SweetAlert2 -->
                 @if ($errors->has('whatsapp'))
                     <script>
                         Swal.fire({
@@ -130,7 +131,6 @@
                     </script>
                 @endif
 
-                <!-- Script Validasi -->
                 <script>
                     document.addEventListener('DOMContentLoaded', function() {
                         const form = document.getElementById('registrationForm');
@@ -179,6 +179,50 @@
                         }
                     }
                 </script>
+
+                {{-- Script untuk Notifikasi Modal (SweetAlert2) --}}
+                @if ($errors->any())
+                    <script>
+                        Swal.fire({
+                            title: "Terjadi Kesalahan!",
+                            html: `{!! implode('<br>', $errors->all()) !!}`,
+                            icon: "error",
+                            confirmButtonText: "OK"
+                        });
+                    </script>
+                @endif
+
+                @if (session('success'))
+                    <script>
+                        Swal.fire({
+                            title: "Pendaftaran Berhasil!",
+                            text: "{{ session('success') }}",
+                            icon: "success",
+                            confirmButtonText: "OK"
+                        });
+                    </script>
+                @endif
+
+                @if (session('existing_participant_info'))
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const info = @json(session('existing_participant_info'));
+
+                            Swal.fire({
+                                title: "Nomor Sudah Terdaftar!",
+                                text: info.message,
+                                icon: "warning",
+                                confirmButtonText: "Lanjutkan Pembayaran",
+                                showCancelButton: true,
+                                cancelButtonText: "Tutup",
+                            }).then((result) => {
+                                if (result.isConfirmed) {
+                                    window.location.href = info.payment_url;
+                                }
+                            });
+                        });
+                    </script>
+                @endif
             </div>
         </div>
     </div>

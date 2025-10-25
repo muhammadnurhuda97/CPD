@@ -55,7 +55,6 @@
     </style>
 
     @php
-        // Logika dinamis yang membaca dari config, bukan env
         $isProduction = config('midtrans.is_production');
         $snapJsUrl = $isProduction
             ? 'https://app.midtrans.com/snap/snap.js'
@@ -63,11 +62,6 @@
     @endphp
 
     <script type="text/javascript" src="{{ $snapJsUrl }}" data-client-key="{{ config('midtrans.client_key') }}"></script>
-
-    {{--  @php
-    $snapJsUrl = 'https://app.midtrans.com/snap/snap.js';
-    @endphp
-    <script type="text/javascript" src="{{ $snapJsUrl }}" data-client-key="{{ env('MIDTRANS_CLIENT_KEY') }}"></script>  --}}
 </head>
 
 <body>
@@ -90,49 +84,35 @@
     <div class="loading-spinner"></div>
 
     <script type="text/javascript">
-        // Pastikan orderId asli yang dikirim controller, jangan fallback lain
-        const snapToken = "{{ $snapToken }}"; //
-        const successRoute = "{{ route('payment.success') }}"; //
-        const errorRoute = "{{ route('payment.error') }}"; //
+        const snapToken = "{{ $snapToken }}";
+        const successRoute = "{{ route('payment.success') }}";
+        const errorRoute = "{{ route('payment.error.page') }}";
+        const orderId = "{{ $orderId ?? '' }}";
 
-        const orderId = "{{ $orderId ?? '' }}"; //
-
-        const getUrlWithParams = (baseRoute, orderIdParam, status = null) => { //
+        const getUrlWithParams = (baseRoute, orderIdParam) => {
             let url = `${baseRoute}?order_id=${encodeURIComponent(orderIdParam)}`;
-            @if ($entityType === 'product' && isset($order->amount))
-                url += `&price={{ $order->amount }}`;
-            @elseif ($entityType === 'event' && isset($price))
-                url += `&price={{ $price }}`;
-            @endif
-            if (status) { //
-                url += `&status=${encodeURIComponent(status)}`;
-            }
             return url;
         };
 
-        window.onload = function() { //
+        window.onload = function() {
             if (typeof snap !== 'undefined') {
-                snap.pay(snapToken, { //
+                snap.pay(snapToken, {
                     onSuccess: function(result) {
                         console.log('Payment Success:', result);
-                        window.location.href = getUrlWithParams(successRoute, orderId, 'success');
+                        window.location.href = getUrlWithParams(successRoute, orderId);
                     },
                     onPending: function(result) {
                         console.log('Payment Pending:', result);
-                        window.location.href = getUrlWithParams(successRoute, orderId, 'pending');
+                        window.location.href = getUrlWithParams(successRoute, orderId);
                     },
                     onError: function(result) {
                         console.error('Payment Error:', result);
-                        window.location.href = getUrlWithParams(errorRoute, orderId, 'error');
+                        window.location.href = getUrlWithParams(errorRoute, orderId);
                     },
-                    // ===== AWAL PERUBAHAN =====
                     onClose: function() {
-                        console.warn('Pembayaran ditutup oleh pengguna, mengarahkan ke halaman status.');
-                        // Mengarahkan ke halaman status, bukan error.
-                        // Controller akan menampilkan halaman pending yang sesuai.
-                        window.location.href = getUrlWithParams(successRoute, orderId, 'closed');
+                        console.warn('Pembayaran ditutup oleh pengguna, mengarahkan ke halaman pending.');
+                        window.location.href = getUrlWithParams(successRoute, orderId);
                     }
-                    // ===== AKHIR PERUBAHAN =====
                 });
             } else {
                 alert("Midtrans Snap.js tidak berhasil dimuat. Silakan coba lagi.");

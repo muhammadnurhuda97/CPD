@@ -1,8 +1,6 @@
-{{-- resources/views/participants/webinar.blade.php --}}
+{{-- resources/views/participants/form.blade.php --}}
 @php
     \Carbon\Carbon::setLocale('id');
-    $eventType = request()->query('event_type', 'webinar');
-    $notification = \App\Models\Notification::where('event_type', $eventType)->latest()->first();
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -11,9 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Form Pendaftaran</title>
     <link rel="stylesheet" href="{{ asset('css/form.css') }}">
-
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
@@ -22,14 +18,14 @@
         <div class="card">
             <div class="formbold-form-wrapper">
                 <div class="formbold-event-wrapper">
-                    <span>WORKSHOP</span>
+                    <span>{{ strtoupper($notification->event_type) }}</span>
 
-                    <h3>{{ $notification ? $notification->event : 'Workshop Digital Marketing Autosmart' }}</h3>
+                    <h3>{{ $notification->event ?? 'Workshop Digital Marketing Autosmart' }}</h3>
                     <img src="{{ asset('storage/' . $notification->banner) }}" style="width: 100%;" alt="Banner">
                     <h4>Apa yang akan Anda Pelajari</h4>
                     <p>
                         Dalam
-                        <strong>{{ $notification ? $notification->event : 'Workshop Digital Marketing Autosmart' }}</strong>,
+                        <strong>{{ $notification->event ?? 'Workshop Digital Marketing Autosmart' }}</strong>,
                         ini akan mengupas tuntas Rahasia Pemasaran Secara Otomatis. Anda akan diajarkan & Praktek
                         Langsung Cara Mendapatkan 10.000 Data Calon Pelanggan Anda secara Otomatis dan melakukan Promosi
                         Otomatis pula kepada mereka. Siap membawa pemasaran bisnis Anda ke level berikutnya?
@@ -47,7 +43,6 @@
                     </div>
                 </div>
 
-                <!-- Form Registrasi -->
                 <form method="POST" action="{{ route('participants.store') }}" id="registrationForm" novalidate>
                     @csrf
                     <h4 class="formbold-form-title">Register now</h4>
@@ -85,8 +80,9 @@
                             value="{{ old('city') }}" required placeholder="Gresik, Jawa Timur" />
                     </div>
 
+                    <input type="hidden" name="notification_id" value="{{ $notification->id }}">
                     <input type="hidden" name="affiliate_id" value="{{ session('affiliate_id') }}">
-                    <input type="hidden" name="event_type" value="{{ $event_type }}">
+                    <input type="hidden" name="event_type" value="{{ $notification->event_type }}">
 
                     <p class="formbold-policy">
                         Dengan mengisi formulir ini dan mengklik kirim, Anda menyetujui <a href="#">kebijakan
@@ -98,92 +94,102 @@
                     </button>
                 </form>
 
-                <!-- Error Handling with SweetAlert2 -->
-                @if ($errors->has('whatsapp'))
-                    <script>
-                        Swal.fire({
-                            title: "Nomor WhatsApp Sudah Terdaftar!",
-                            text: "{{ $errors->first('whatsapp') }}",
-                            icon: "error",
-                            confirmButtonText: "OK"
-                        });
-                    </script>
-                @endif
-
-                @if ($errors->has('email'))
-                    <script>
-                        Swal.fire({
-                            title: "Email Tidak Valid!",
-                            text: "{{ $errors->first('email') }}",
-                            icon: "error",
-                            confirmButtonText: "OK"
-                        });
-                    </script>
-                @endif
-
-                @if (session('success'))
-                    <script>
-                        Swal.fire({
-                            title: "Pendaftaran Berhasil!",
-                            text: "{{ session('success') }}",
-                            icon: "success",
-                            confirmButtonText: "OK"
-                        });
-                    </script>
-                @endif
-
-                <!-- Script Validasi -->
-                <script>
-                    document.addEventListener('DOMContentLoaded', function() {
-                        const form = document.getElementById('registrationForm');
-                        const requiredInputs = form.querySelectorAll('input[required]');
-
-                        requiredInputs.forEach(input => {
-                            input.addEventListener('invalid', function(e) {
-                                e.target.setCustomValidity('Harap isi bagian ini');
-                            });
-
-                            input.addEventListener('input', function(e) {
-                                e.target.setCustomValidity('');
-                            });
-                        });
-
-                        form.addEventListener('submit', function(e) {
-                            let allValid = true;
-
-                            requiredInputs.forEach(input => {
-                                if (!input.checkValidity()) {
-                                    input.reportValidity();
-                                    allValid = false;
-                                }
-                            });
-
-                            if (!allValid) {
-                                e.preventDefault();
-                            }
-                        });
-                    });
-
-                    function formatWhatsappNumber(event) {
-                        const input = event.target;
-                        let value = input.value.replace(/\D/g, '');
-
-                        if (value.startsWith('62')) {
-                            value = '0' + value.slice(2);
-                        }
-
-                        if (value.length <= 4) {
-                            input.value = value;
-                        } else if (value.length <= 8) {
-                            input.value = value.replace(/(\d{4})(\d{1,4})/, '$1-$2');
-                        } else {
-                            input.value = value.replace(/(\d{4})(\d{4})(\d{1,4})/, '$1-$2-$3');
-                        }
-                    }
-                </script>
             </div>
         </div>
     </div>
+
+    <script>
+        // Script untuk Validasi Form
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('registrationForm');
+            const requiredInputs = form.querySelectorAll('input[required]');
+
+            requiredInputs.forEach(input => {
+                input.addEventListener('invalid', function(e) {
+                    e.target.setCustomValidity('Harap isi bagian ini');
+                });
+                input.addEventListener('input', function(e) {
+                    e.target.setCustomValidity('');
+                });
+            });
+
+            form.addEventListener('submit', function(e) {
+                let allValid = true;
+                requiredInputs.forEach(input => {
+                    if (!input.checkValidity()) {
+                        input.reportValidity();
+                        allValid = false;
+                    }
+                });
+                if (!allValid) {
+                    e.preventDefault();
+                }
+            });
+        });
+
+        // Script untuk Format Nomor WhatsApp
+        function formatWhatsappNumber(event) {
+            const input = event.target;
+            let value = input.value.replace(/\D/g, '');
+
+            if (value.startsWith('62')) {
+                value = '0' + value.slice(2);
+            }
+
+            if (value.length <= 4) {
+                input.value = value;
+            } else if (value.length <= 8) {
+                input.value = value.replace(/(\d{4})(\d{1,4})/, '$1-$2');
+            } else {
+                input.value = value.replace(/(\d{4})(\d{4})(\d{1,4})/, '$1-$2-$3');
+            }
+        }
+    </script>
+
+    {{-- Script untuk Notifikasi Modal (SweetAlert2) --}}
+    @if ($errors->any())
+        <script>
+            Swal.fire({
+                title: "Terjadi Kesalahan!",
+                html: `{!! implode('<br>', $errors->all()) !!}`,
+                icon: "error",
+                confirmButtonText: "OK"
+            });
+        </script>
+    @endif
+
+    @if (session('success'))
+        <script>
+            Swal.fire({
+                title: "Pendaftaran Berhasil!",
+                text: "{{ session('success') }}",
+                icon: "success",
+                confirmButtonText: "OK"
+            });
+        </script>
+    @endif
+
+    @if (session('existing_participant_info'))
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const info = @json(session('existing_participant_info'));
+
+                Swal.fire({
+                    title: "Nomor Sudah Terdaftar!",
+                    text: info.message,
+                    icon: "warning",
+                    confirmButtonText: "Lanjutkan Pembayaran",
+                    showCancelButton: true,
+                    cancelButtonText: "Tutup",
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = info.payment_url;
+                    }
+                });
+            });
+        </script>
+    @endif
+
 </body>
 
 </html>

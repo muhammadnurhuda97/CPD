@@ -9,18 +9,22 @@ use App\Models\Order;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use App\Jobs\SendWhatsAppReminder;
+use App\Jobs\CheckPaymentStatusAndNotify;
+use App\Jobs\SendUnpaidWorkshopReminder;
 
 class WhatsAppNotificationService
 {
-    /**
-     * Mengirim notifikasi pendaftaran event (gratis atau setelah lunas) ke peserta.
-     */
-    public function sendToParticipant(Participant $participant, $affiliateId)
+    public function sendPaidConfirmation(Participant $participant)
     {
-        $eventType = $participant->event_type;
-        $notification = Notification::where('event_type', $eventType)->latest()->first();
+        if ($participant->notified_paid) {
+            Log::info("WANS: Notifikasi lunas sudah terkirim sebelumnya untuk participant {$participant->id}.");
+            return;
+        }
+
+        $notification = $participant->notification;
+
         if (!$notification) {
-            Log::warning("WANS: Notification data not found for event_type '{$eventType}'.");
+            Log::warning("WANS: Data notifikasi tidak ditemukan untuk Participant ID '{$participant->id}'.");
             return;
         }
 
@@ -30,136 +34,282 @@ class WhatsAppNotificationService
         $eventTimeWIB = $eventDateWIB->format('H.i') . ' WIB';
 
         $locationDetailsWithLink = '';
-        $locationDetailsWithoutLink = '';
-        if ($eventType === 'webinar') {
+        if ($participant->event_type === 'webinar') {
             $locationDetailsWithLink = "- 🖥️ Lokasi: *Online via Zoom*\n- Link Acara: *{$notification->zoom}*\n\n";
-            $locationDetailsWithoutLink = "- 🖥️ Lokasi: *Online via Zoom*\n\n";
-        } elseif ($eventType === 'workshop') {
+        } elseif ($participant->event_type === 'workshop') {
             $locationDetailsWithLink = "- 📍 Lokasi: *{$notification->location_name}*\n" .
                 "- Alamat: *{$notification->location_address}*\n" .
                 "- Link Gmaps: *{$notification->location}*\n\n";
-            $locationDetailsWithoutLink = "- 📍 Lokasi: *{$notification->location_name}*\n" .
-                "- Alamat: *{$notification->location_address}*\n\n";
         }
 
-        $affiliateName = 'Tim Support';
-        // Mengambil nomor admin dari konfigurasi yang sudah di-parse ke array
-        $adminWhatsappNumbers = config('services.admin.whatsapp', ['082245342997']);
-        $supportContact = $adminWhatsappNumbers[0] ?? '082245342997'; // Gunakan nomor pertama sebagai default support contact
+        $message = "Halo Kak {$participant->name}, 🎉 Selamat! Pembayaran Anda untuk acara *{$eventName}* telah berhasil kami terima.\n\n" .
+            "*Detail Acara:*\n" .
+            "- Acara: *{$eventName}*\n" .
+            "- 📅 Hari, Tanggal: *{$eventDateWIBFormatted}*\n" .
+            "- ⏰ Jam: *{$eventTimeWIB}*\n" .
+            $locationDetailsWithLink .
+            "Sampai jumpa di acara ya! 🙏🏻";
 
-        if ($affiliateId && strtolower($affiliateId) !== 'admin') {
-            $affiliate = User::where('username', $affiliateId)->first();
-            if ($affiliate) {
-                $affiliateName = $affiliate->name;
-                $supportContact = $affiliate->whatsapp ?? $supportContact;
-            }
-        } else {
-            $affiliateName = 'Admin';
+        $payload = [
+            'messageType' => 'text',
+            'to' => $participant->whatsapp,
+            'body' => $message,
+        ];
+
+        $this->sendToStarsender($payload);
+        Log::info("WANS: Mengirim notifikasi LUNAS ke PESERTA -> {$participant->whatsapp} untuk event '{$eventName}'.");
+
+        $participant->notified_paid = true;
+        $participant->save();
+    }
+
+    /**
+     * Menggunakan logika fallback: coba H-2 Jam, jika sudah lewat, coba H-30 Menit.
+     * Logika H+6 Jam SUDAH DIHAPUS dari sini.
+     */
+    public function schedulePaidEventReminders(Participant $participant)
+    {
+        if ($participant->paid_reminder_scheduled) {
+            Log::info("WANS: Pengingat pra-acara untuk peserta lunas (ID: {$participant->id}) sudah dijadwalkan sebelumnya.");
+            return;
         }
 
-        $messageTemplate = function ($title, $extraText = '', $showLink = false) use (
-            $participant,
-            $eventDateWIBFormatted,
-            $eventTimeWIB,
-            $locationDetailsWithLink,
-            $locationDetailsWithoutLink,
-            $affiliateName,
-            $supportContact
-        ) {
-            $locationText = $showLink ? $locationDetailsWithLink : $locationDetailsWithoutLink;
+        $notification = $participant->notification;
+        if (!$notification) {
+            Log::warning("WANS: Gagal menjadwalkan reminder, data notifikasi tidak ditemukan untuk Participant ID '{$participant->id}'.");
+            return;
+        }
 
-            $defaultExtraText = "Pastikan Anda bergabung tepat waktu agar tidak ketinggalan informasi penting.";
-            $finalExtraText = !empty($extraText) ? $extraText : $defaultExtraText;
+        $eventName = $notification->event;
+        $eventDateWIB = Carbon::parse($notification->event_date . ' ' . $notification->event_time, 'Asia/Jakarta');
 
-            $includesSupport = stripos($finalExtraText, 'Kontak Support') !== false;
-            $includesNote = stripos($finalExtraText, 'Note:') !== false;
+        $locationDetailsWithLink = "- 📍 Lokasi: *{$notification->location_name}*\n" .
+            "- Alamat: *{$notification->location_address}*\n" .
+            "- Link Gmaps: *{$notification->location}*\n\n";
 
-            $message = "Halo Kak {$participant->name}, {$title}\n\n" .
-                "- 📅 Hari, Tanggal: *{$eventDateWIBFormatted}*\n" .
-                "- ⏰ Jam: *{$eventTimeWIB}*\n" .
-                $locationText .
-                $finalExtraText . "\n\n";
+        // Hitung waktu jadwal
+        $scheduleTimeH2 = $eventDateWIB->copy()->subHours(2);
+        $scheduleTimeH30 = $eventDateWIB->copy()->subMinutes(30);
 
-            if (!$includesSupport) {
-                $message .= "📞 Kontak Support: *{$affiliateName}* - *{$supportContact}*\n\n";
-            }
+        $messageToSend = null;
+        $scheduleTimestamp = null;
+        $reminderType = '';
 
-            if (!$includesNote) {
-                $message .= "Note: *Jika tautan tidak berfungsi, balas pesan ini.*";
-            }
+        // Prioritas 1: Jadwalkan reminder H-2 Jam jika waktunya masih valid.
+        if ($scheduleTimeH2->isFuture()) {
+            $reminderType = 'H-2 Jam';
+            $scheduleTimestamp = $scheduleTimeH2->timezone('UTC')->timestamp * 1000;
+            $messageToSend = "Halo kak {$participant->name} 🤗\n\n" .
+                "Sekedar mengingatkan ya kak untuk hadir di acara *{$eventName}* yang akan dilaksanakan pada:\n\n" .
+                "- Hari / Tanggal : *{$eventDateWIB->translatedFormat('l, d F Y')}*\n" .
+                "- Pukul : *{$eventDateWIB->format('H.i')} WIB*\n" .
+                $locationDetailsWithLink .
+                "Jangan lupa konfirmasi kehadiran ke petugas saat tiba di lokasi ya kak 🙏🏻\n\n" .
+                "Sampai ketemu di lokasi acara ya kak 🤗";
 
-            return $message;
-        };
+            // Prioritas 2 (Fallback): Jika H-2 jam sudah lewat, jadwalkan reminder H-30 Menit.
+        } elseif ($scheduleTimeH30->isFuture()) {
+            $reminderType = 'H-30 Menit';
+            $scheduleTimestamp = $scheduleTimeH30->timezone('UTC')->timestamp * 1000;
+            $messageToSend = "Halo kak {$participant->name} 🤗\n\n" .
+                "Acara *{$eventName}* akan dimulai sekitar 30 menit lagi!\n\n" .
+                "- Pukul : *{$eventDateWIB->format('H.i')} WIB*\n" .
+                $locationDetailsWithLink .
+                "Kami tunggu kehadirannya ya kak. Hati-hati di jalan! 🙏🏻";
+        }
 
-        $eventDateUTC = $eventDateWIB->copy()->timezone('UTC');
-        $timestampUTC = $eventDateUTC->timestamp * 1000;
-        $reminder1DayBeforeTimestamp = $eventDateWIB->copy()->subDay()->setTime(18, 0)->timezone('UTC')->timestamp * 1000;
-        $followUpAfterEventTimestamp = $eventDateWIB->copy()->setTime(21, 30)->timezone('UTC')->timestamp * 1000;
-
-        $schedules = [
-            '1_day_before' => $reminder1DayBeforeTimestamp,
-            '30_min_before' => $timestampUTC - (30 * 60 * 1000),
-            'post_event_fixed_time' => $followUpAfterEventTimestamp,
-        ];
-
-        $messages = [
-            [
-                'body' => $messageTemplate(
-                    'selamat! 🎉 Anda berhasil mendaftar di acara *' . $eventName . '*'
-                )
-            ],
-            [
-                'body' => $messageTemplate(
-                    '😊 Pengingat acara *' . $eventName . '* besok!',
-                    'Sampai jumpa besok ya!'
-                ),
-                'schedule' => $schedules['1_day_before']
-            ],
-            [
-                'body' => $messageTemplate(
-                    '🚀 Acara *' . $eventName . '* dimulai dalam 30 menit!',
-                    '',
-                    true
-                ),
-                'schedule' => $schedules['30_min_before']
-            ],
-            [
-                'body' => $messageTemplate(
-                    '🎉 Acara *' . $eventName . '* telah selesai! Kami berharap Anda mendapat manfaat!',
-                    'Terima kasih telah hadir!'
-                ),
-                'schedule' => $schedules['post_event_fixed_time']
-            ],
-        ];
-
-        foreach ($messages as $msg) {
+        // Jika ada pesan yang perlu dijadwalkan (baik H-2 atau H-30)
+        if ($messageToSend && $scheduleTimestamp) {
             $payload = [
                 'messageType' => 'text',
-                'to' => $participant->whatsapp,
-                'body' => $msg['body'],
+                'to'          => $participant->whatsapp,
+                'body'        => $messageToSend,
+                'schedule'    => $scheduleTimestamp,
             ];
-            if (isset($msg['schedule'])) {
-                $payload['schedule'] = $msg['schedule'];
-            }
             $this->sendToStarsender($payload);
+            Log::info("WANS: Menjadwalkan reminder LUNAS ({$reminderType}) di Starsender untuk peserta -> {$participant->whatsapp}");
+
+            // Tandai bahwa reminder pra-acara sudah dijadwalkan
+            $participant->paid_reminder_scheduled = true;
+            $participant->save();
+        } else {
+            Log::info("WANS: Tidak ada jadwal reminder pra-acara yang valid untuk peserta lunas {$participant->id} karena waktu acara sudah terlalu dekat.");
         }
     }
 
-    public function sendAdminNotification($participant, $eventType)
+    public function sendPostEventMessage(Participant $participant)
     {
-        $eventName = Notification::where('event_type', $eventType)->latest()->first()->event ?? 'Event Tidak Ditemukan';
-        $affiliateName = User::where('username', $participant->affiliate_id)->first()->name ?? 'Affiliate Tidak Ditemukan';
+        $notification = $participant->notification;
+        if (!$notification) {
+            Log::warning("WANS (After-Event): Gagal, data notifikasi tidak ditemukan untuk Participant ID '{$participant->id}'.");
+            return;
+        }
 
-        $adminMessage = "Peserta baru telah mendaftar acara *{$eventName}*!\n\n" .
+        $eventDateWIB = Carbon::parse($notification->event_date . ' ' . $notification->event_time, 'Asia/Jakarta');
+        $scheduleTimestamp = $eventDateWIB->copy()->addHours(6)->timezone('UTC')->timestamp * 1000;
+
+        if (Carbon::createFromTimestampMs($scheduleTimestamp)->isFuture()) {
+            $message = "Halo kak {$participant->name} 🤗\n\n" .
+                "Terimakasih sudah hadir di acara workshop Giat Muda Entrepreneur dengan tema Strategi Pemasaran Di Era Digital 🎉\n\n" .
+                "Semoga acara workshop nya bermanfaat bagi kak {$participant->name} untuk pengembangan bisnis nya di era digital saat ini 😊🤲🏻\n\n" .
+                "Apa ada hal yang ingin ditanyakan lebih lanjut mengenai acara workshop nya kak ?\n\n" .
+                "Salam\n" .
+                "Giat Muda Entrepreneur";
+
+            $payload = [
+                'messageType' => 'text',
+                'to'          => $participant->whatsapp,
+                'body'        => $message,
+                'schedule'    => $scheduleTimestamp,
+            ];
+
+            $this->sendToStarsender($payload);
+            Log::info("WANS: Menjadwalkan pesan After-Event (H+6 Jam) di Starsender untuk peserta ID {$participant->id}.");
+        }
+    }
+    public function schedulePostEventReminderForNonPaid(Participant $participant)
+    {
+        // Pengecekan sederhana untuk mencegah duplikasi jika job berjalan ulang
+        if ($participant->paid_reminder_scheduled) {
+            return;
+        }
+
+        $notification = $participant->notification;
+        if (!$notification) {
+            Log::warning("WANS: Gagal menjadwalkan reminder H+6, notifikasi tidak ditemukan untuk Participant ID '{$participant->id}'.");
+            return;
+        }
+
+        $eventDateWIB = Carbon::parse($notification->event_date . ' ' . $notification->event_time, 'Asia/Jakarta');
+        $scheduleTimestamp = $eventDateWIB->copy()->addHours(6)->timezone('UTC')->timestamp * 1000;
+
+        if (Carbon::createFromTimestampMs($scheduleTimestamp)->isFuture()) {
+            $message = "Halo kak {$participant->name} 🤗\n\n" .
+                "Terimakasih sudah hadir di acara workshop Giat Muda Entrepreneur dengan tema Strategi Pemasaran Di Era Digital 🎉\n\n" .
+                "Semoga acara workshop nya bermanfaat bagi kak {$participant->name} untuk pengembangan bisnis nya di era digital saat ini 😊🤲🏻\n\n" .
+                "Apa ada hal yang ingin ditanyakan lebih lanjut mengenai acara workshop nya kak ?\n\n" .
+                "Salam\n" .
+                "Giat Muda Entrepreneur";
+
+            $payload = [
+                'messageType' => 'text',
+                'to'          => $participant->whatsapp,
+                'body'        => $message,
+                'schedule'    => $scheduleTimestamp,
+            ];
+
+            $this->sendToStarsender($payload);
+            Log::info("WANS: Menjadwalkan reminder H+6 Jam (NON-PAID) di Starsender untuk peserta -> {$participant->whatsapp}");
+        }
+    }
+
+
+    /**
+     * Mengirim notifikasi pengingat tunai di lokasi untuk workshop berbayar yang belum lunas.
+     * Ini dipanggil dari Job CheckPaymentStatusAndNotify.
+     */
+    public function sendUnpaidWorkshopReminder(Participant $participant)
+    {
+        if ($participant->payment_status === 'paid' || $participant->reminder_scheduled) {
+            Log::info("WANS: Peserta sudah lunas atau reminder sudah terjadwal, tidak memproses reminder tunai untuk participant {$participant->id}.");
+            return;
+        }
+        $notification = $participant->notification;
+        if (!$notification) {
+            Log::warning("WANS: Data notifikasi tidak ditemukan untuk Participant ID '{$participant->id}'.");
+            return;
+        }
+        $eventDateWIB = Carbon::parse($notification->event_date . ' ' . $notification->event_time, 'Asia/Jakarta');
+        $executionTime = $eventDateWIB->copy()->subHours(2);
+
+        // Jika waktu eksekusi H-2 Jam masih di masa depan
+        if ($executionTime->isFuture()) {
+            // JADWALKAN JOB seperti biasa
+            SendUnpaidWorkshopReminder::dispatch($participant->id)->delay($executionTime);
+            Log::info("WANS: Menjadwalkan JOB SendUnpaidWorkshopReminder untuk participant {$participant->id} agar berjalan pada {$executionTime->toDateTimeString()}");
+
+            $participant->reminder_scheduled = true;
+            $participant->save();
+        } else {
+            // JIKA WAKTU SUDAH MEPET, LANGSUNG KIRIM REMINDER TUNAI SAAT ITU JUGA
+            Log::warning("WANS: Waktu acara sudah terlalu dekat untuk participant {$participant->id}. Mengirim reminder tunai sekarang.");
+            $this->sendUnpaidWorkshopReminderMessage($participant); // <-- Panggil fungsi pengirim pesan
+
+            // Tetap tandai agar tidak dikirim dua kali
+            $participant->reminder_scheduled = true;
+            $participant->save();
+        }
+    }
+
+    /**
+     * FUNGSI BARU: Berisi teks reminder H-2 Jam untuk peserta yang belum lunas.
+     * Fungsi ini dipanggil LANGSUNG oleh SendUnpaidWorkshopReminder Job.
+     */
+    public function sendUnpaidWorkshopReminderMessage(Participant $participant)
+    {
+        Log::info("WANS-DEBUG: Masuk ke fungsi sendUnpaidWorkshopReminderMessage untuk Participant ID: {$participant->id}");
+        Log::info("WANS-DEBUG: Data Peserta:", $participant->toArray());
+        Log::info("WANS-DEBUG: Mengecek relasi 'notification'...");
+
+        $notification = $participant->notification;
+        if (!$notification) {
+            Log::warning("WANS: Gagal mengirim reminder tunai, data notifikasi tidak ditemukan untuk Participant ID '{$participant->id}'. Fungsi berhenti.");
+            return;
+        }
+
+        Log::info("WANS-DEBUG: Relasi 'notification' ditemukan. Lanjut membuat pesan.");
+
+        $eventName = $notification->event;
+        Carbon::setLocale('id');
+        $eventDateWIB = Carbon::parse($notification->event_date . ' ' . $notification->event_time, 'Asia/Jakarta');
+        $eventDateWIBFormatted = $eventDateWIB->translatedFormat('l, d F Y');
+        $eventTimeWIB = $eventDateWIB->format('H.i') . ' WIB';
+
+        $locationDetailsWithLink = "- 📍 Lokasi: *{$notification->location_name}*\n" .
+            "- Alamat: *{$notification->location_address}*\n" .
+            "- Link Gmaps: *{$notification->location}*\n\n";
+
+        $message =
+            "Halo kak {$participant->name} 🤗\n\n" .
+            "Sekedar mengingatkan ya kak untuk hadir di acara *{$eventName}* dengan tema Strategi Pemasaran Di Era Digital yang akan dilaksanakan pada :\n\n" .
+            "- Hari / Tanggal : *{$eventDateWIBFormatted}*\n" .
+            "- Pukul : *{$eventTimeWIB}*\n" .
+            $locationDetailsWithLink .
+            "💵 *Apabila belum melakukan pembayaran, kakak juga bisa melakukan pembayaran secara tunai di lokasi acara ya.*\n\n" .
+            "Jangan lupa konfirmasi kehadiran ke petugas saat tiba di lokasi ya kak 🙏🏻\n\n" .
+            "Sampai ketemu di lokasi acara ya kak 🤗\n\n" .
+            "Salam\n" .
+            "Giat Muda Entrepreneur";
+
+        $payload = [
+            'messageType' => 'text',
+            'to'          => $participant->whatsapp,
+            'body'        => $message,
+        ];
+
+        Log::info("WANS-DEBUG: Pesan sudah dibuat, siap dikirim ke Starsender.");
+
+        $this->sendToStarsender($payload);
+
+        Log::info("WANS: Mengirim reminder pembayaran tunai H-2 Jam ke PESERTA -> {$participant->whatsapp} untuk event '{$eventName}'.");
+    }
+
+    public function sendAdminNotification($participant)
+    {
+        $eventName = $participant->notification->event ?? 'Event Tidak Ditemukan';
+        $affiliateUser = User::find($participant->affiliate_id);
+        $affiliateName = $affiliateUser ? $affiliateUser->name : 'Tanpa Afiliasi';
+
+        $adminMessage = "Peserta baru lunas untuk acara *{$eventName}*!\n\n" .
             "Nama: *{$participant->name}*\n" .
             "No. WhatsApp: *{$participant->whatsapp}*\n" .
             "Pengundang: *{$affiliateName}*\n\n" .
             "Segera verifikasi dan tindak lanjuti pendaftaran ini.";
 
-        // Mengambil nomor admin dari konfigurasi yang sudah di-parse ke array
         $adminNumbers = config('services.admin.whatsapp', ['082245342997']);
 
-        // Loop untuk setiap nomor admin dan kirim pesan terpisah
+        Log::info("WANS: Mempersiapkan pengiriman notifikasi LUNAS ke ADMIN -> " . implode(', ', $adminNumbers));
+
         foreach ($adminNumbers as $number) {
             if (!empty(trim($number))) {
                 $this->sendToStarsender(['messageType' => 'text', 'to' => trim($number), 'body' => $adminMessage]);
@@ -169,15 +319,14 @@ class WhatsAppNotificationService
 
     public function sendAffiliateNotification($affiliateId, $participant, $eventType)
     {
-        $eventName = Notification::where('event_type', $eventType)->latest()->first()->event ?? 'Event Tidak Ditemukan';
-        $affiliate = User::where('username', $affiliateId)->first();
+        $eventName = $participant->notification->event ?? 'Event Tidak Ditemukan';
+        $affiliate = User::find($affiliateId);
 
         if ($affiliate && $affiliate->whatsapp) {
-            $affiliateMessage = "🎉 Wah, Selamat *{$affiliate->name}*👋\n\n" .
-                "Anda telah berhasil mengundang *{$participant->name}* ke acara *{$eventName}*.\n" .
-                "Whatsapp: *{$participant->whatsapp}*\n" .
-                "E-mail: *{$participant->email}*\n\n" .
-                "Jangan lupa follow up ya! Siapa tahu jadi rejeki kamu! 🏆";
+            $affiliateMessage = "🎉 Selamat Kak *{$affiliate->name}*!\n\n" .
+                "Peserta undangan Anda, *{$participant->name}*, telah melunasi pembayaran untuk acara *{$eventName}*.";
+
+            Log::info("WANS: Mempersiapkan pengiriman notifikasi LUNAS ke AFFILIATE -> {$affiliate->whatsapp}");
 
             $this->sendToStarsender(['messageType' => 'text', 'to' => $affiliate->whatsapp, 'body' => $affiliateMessage]);
         }
@@ -203,7 +352,7 @@ class WhatsAppNotificationService
         if ($entity instanceof Participant) {
             $recipientWhatsapp = $entity->whatsapp;
             $recipientName = $entity->name;
-            $itemName = ucfirst($entity->event_type) . ' Event';
+            $itemName = $entity->notification->event ?? 'Event';
             $orderId = $entity->order_id;
         } elseif ($entity instanceof Order) {
             $recipientWhatsapp = $entity->user->whatsapp ?? null;
@@ -213,19 +362,17 @@ class WhatsAppNotificationService
         }
 
         if (is_null($recipientWhatsapp) || empty($orderId)) {
-            Log::warning("WANS: Cannot send pending payment details. Recipient WhatsApp or Order ID is missing.", ['entity_id' => $entity->id]);
+            Log::warning("WANS: Tidak dapat mengirim detail pembayaran. No WhatsApp atau Order ID hilang.", ['entity_id' => $entity->id]);
             return;
         }
 
-        // Mengambil nomor admin dari konfigurasi yang sudah di-parse ke array
         $adminWhatsappNumbers = config('services.admin.whatsapp', ['082245342997']);
-        // Menggabungkan untuk tampilan pesan (format "nomor1 atau nomor2")
         $adminPhoneNumberForDisplay = implode(' atau ', array_filter(array_map('trim', $adminWhatsappNumbers)));
         if (empty($adminPhoneNumberForDisplay)) {
-            $adminPhoneNumberForDisplay = '082245342997'; // Fallback jika array kosong
+            $adminPhoneNumberForDisplay = '082245342997';
         }
 
-        $message  = "Halo {$recipientName},\n\n";
+        $message  = "Halo Kak {$recipientName},\n\n";
         $message .= "Pembayaran Anda untuk *{$itemName}* sebesar *Rp " . number_format($amount, 0, ',', '.') . "* sedang menunggu. \n\n";
         $message .= "*Detail Pembayaran:*\n";
 
@@ -270,7 +417,7 @@ class WhatsAppNotificationService
         $message .= "Jika ada kendala, hubungi kami di {$adminPhoneNumberForDisplay}.\n\nTerima kasih!";
 
         $this->sendToStarsender(['messageType' => 'text', 'to' => $recipientWhatsapp, 'body' => $message]);
-        Log::info("WANS: Sent initial pending payment details to {$recipientName} for orderId {$orderId}.");
+        Log::info("WANS: Mengirim detail pembayaran PENDING ke PESERTA -> {$recipientWhatsapp} untuk OrderId {$entity->order_id}.");
     }
 
     public function schedulePendingFollowUps(
@@ -287,10 +434,12 @@ class WhatsAppNotificationService
         string $orderId
     ) {
         $recipientWhatsapp = ($entity instanceof Participant) ? $entity->whatsapp : ($entity->user->whatsapp ?? null);
-        $itemName = ($entity instanceof Participant) ? (ucfirst($entity->event_type) . ' Event') : ($entity->product->name ?? 'Produk');
+        $itemName = ($entity instanceof Participant) ? ($entity->notification->event ?? 'Event') : ($entity->product->name ?? 'Produk');
         $itemType = ($entity instanceof Participant) ? 'event' : 'produk';
 
-        if (is_null($recipientWhatsapp)) return;
+        if (is_null($recipientWhatsapp)) {
+            return;
+        }
 
         $paymentDetailsForJob = [
             'payment_type' => $paymentType,
@@ -303,84 +452,128 @@ class WhatsAppNotificationService
         ];
 
         $transactionCreationTime = $expiryTime->copy()->subHours(config('services.midtrans.va_expiry_hours', 24));
-        $reminder1Time = $transactionCreationTime->copy()->addHours(6);
-        if ($reminder1Time->isFuture() && $reminder1Time->lessThan($expiryTime)) {
-            dispatch(new SendWhatsAppReminder($recipientWhatsapp, $itemName, $itemType, $amount, $expiryTime, $orderId, 'pending_reminder_1', $paymentDetailsForJob))->delay($reminder1Time);
-            Log::info("WANS: Scheduled first pending reminder for {$orderId} at {$reminder1Time->toDateTimeString()}.");
-        }
 
-        $reminder2Time = $expiryTime->copy()->subHours(2);
-        if ($reminder2Time->isFuture() && $reminder2Time->greaterThan(now()) && $reminder2Time->greaterThan($reminder1Time)) {
-            dispatch(new SendWhatsAppReminder($recipientWhatsapp, $itemName, $itemType, $amount, $expiryTime, $orderId, 'pending_reminder_2', $paymentDetailsForJob))->delay($reminder2Time);
-            Log::info("WANS: Scheduled second pending reminder for {$orderId} at {$reminder2Time->toDateTimeString()}.");
+        if ($itemType === 'event') {
+            // Ambil tanggal dan waktu event dari entity, gabungkan jadi Carbon instance
+            $eventDate = $entity->event_date ?? null; // misal '2025-09-10'
+            $eventTime = $entity->event_time ?? null; // misal '14:00:00'
+
+            if ($eventDate && $eventTime) {
+                $eventDateTime = Carbon::parse("{$eventDate} {$eventTime}");
+            } elseif ($eventDate) {
+                $eventDateTime = Carbon::parse($eventDate)->endOfDay();
+            } else {
+                $eventDateTime = null;
+            }
+
+            // Reminder 4 jam setelah transaksi dibuat
+            $reminderTime = $transactionCreationTime->copy()->addHours(4);
+
+            // Kirim reminder hanya jika reminderTime sebelum eventDateTime dan masih di masa depan
+            if ($reminderTime->isFuture() && (!$eventDateTime || $reminderTime->lessThan($eventDateTime))) {
+                dispatch(new SendWhatsAppReminder(
+                    $recipientWhatsapp,
+                    $itemName,
+                    $itemType,
+                    $amount,
+                    $expiryTime,
+                    $orderId,
+                    'event_pending_reminder',
+                    $paymentDetailsForJob
+                ))->delay($reminderTime);
+
+                Log::info("WANS: Menjadwalkan pengingat event transaksi untuk {$orderId} pada {$reminderTime->toDateTimeString()}.");
+            }
+        } else {
+            // Logika produk tetap sama
+            $reminder1Time = $transactionCreationTime->copy()->addHours(6);
+            if ($reminder1Time->isFuture() && $reminder1Time->lessThan($expiryTime)) {
+                dispatch(new SendWhatsAppReminder(
+                    $recipientWhatsapp,
+                    $itemName,
+                    $itemType,
+                    $amount,
+                    $expiryTime,
+                    $orderId,
+                    'pending_reminder_1',
+                    $paymentDetailsForJob
+                ))->delay($reminder1Time);
+                Log::info("WANS: Menjadwalkan pengingat produk pertama untuk {$orderId} pada {$reminder1Time->toDateTimeString()}.");
+            }
+
+            $reminder2Time = $expiryTime->copy()->subHours(2);
+            if ($reminder2Time->isFuture() && $reminder2Time->greaterThan(now()) && $reminder2Time->greaterThan($reminder1Time)) {
+                dispatch(new SendWhatsAppReminder(
+                    $recipientWhatsapp,
+                    $itemName,
+                    $itemType,
+                    $amount,
+                    $expiryTime,
+                    $orderId,
+                    'pending_reminder_2',
+                    $paymentDetailsForJob
+                ))->delay($reminder2Time);
+                Log::info("WANS: Menjadwalkan pengingat produk kedua untuk {$orderId} pada {$reminder2Time->toDateTimeString()}.");
+            }
         }
     }
 
-    public function sendEventFollowUpCancellation(Participant $participant)
+    public function sendEventQrisExpiredNotification(Participant $participant)
     {
-        $eventName = Notification::where('event_type', $participant->event_type)->latest()->first()->event ?? 'Event Tidak Ditemukan';
-        // Mengambil nomor admin dari konfigurasi yang sudah di-parse ke array
-        $adminWhatsappNumbers = config('services.admin.whatsapp', ['082245342997']);
-        // Menggabungkan untuk tampilan pesan (format "nomor1 atau nomor2")
-        $adminPhoneNumberForDisplay = implode(' atau ', array_filter(array_map('trim', $adminWhatsappNumbers)));
-        if (empty($adminPhoneNumberForDisplay)) {
-            $adminPhoneNumberForDisplay = '082245342997'; // Fallback jika array kosong
-        }
+        $eventName = $participant->notification->event ?? 'Event';
 
-        $message = "Halo {$participant->name},\n\n" .
-            "Kami melihat pembayaran Anda untuk pendaftaran acara *{$eventName}* tidak berhasil atau dibatalkan. 😟\n\n" .
-            "Anda bisa coba daftar/bayar lagi atau hubungi kami di {$adminPhoneNumberForDisplay} untuk bantuan.\n\n" .
+        $paymentLink = route('payment.success', ['order_id' => $participant->order_id]);
+
+        $message = "Halo Kak {$participant->name},\n\n" .
+            "Pembayaran QRIS Anda untuk event *{$eventName}* telah kedaluwarsa. 😟\n\n" .
+            "Jika Anda ingin mencoba melakukan pembayaran lagi, silakan kunjungi kembali link pembayaran Anda di bawah ini:\n" .
+            "{$paymentLink}\n\n" .
             "Terima kasih!";
 
         $this->sendToStarsender(['messageType' => 'text', 'to' => $participant->whatsapp, 'body' => $message]);
-        Log::info("WANS: Sent cancellation follow-up to participant {$participant->id} for event.");
+        Log::info("WANS: Mengirim notifikasi QRIS expired ke peserta {$participant->id} untuk event '{$eventName}'.");
     }
 
     public function sendProductFollowUpCancellation($order)
     {
         $userName = $order->user->name ?? 'Pelanggan';
         $productName = $order->product->name ?? 'Produk';
-        // Mengambil nomor admin dari konfigurasi yang sudah di-parse ke array
         $adminWhatsappNumbers = config('services.admin.whatsapp', ['082245342997']);
-        // Menggabungkan untuk tampilan pesan (format "nomor1 atau nomor2")
         $adminPhoneNumberForDisplay = implode(' atau ', array_filter(array_map('trim', $adminWhatsappNumbers)));
         if (empty($adminPhoneNumberForDisplay)) {
-            $adminPhoneNumberForDisplay = '082245342997'; // Fallback jika array kosong
+            $adminPhoneNumberForDisplay = '082245342997';
         }
 
         if (is_null($order->user->whatsapp)) return;
 
-        $message = "Halo {$userName},\n\n" .
+        $message = "Halo Kak {$userName},\n\n" .
             "Pembayaran Anda untuk produk *{$productName}* tidak berhasil atau dibatalkan. 😔\n\n" .
             "Anda bisa coba pesan/bayar lagi atau hubungi kami di {$adminPhoneNumberForDisplay} jika butuh bantuan.\n\n" .
             "Terima kasih!";
 
         $this->sendToStarsender(['messageType' => 'text', 'to' => $order->user->whatsapp, 'body' => $message]);
-        Log::info("WANS: Sent cancellation follow-up to user {$userName} for product {$productName}.");
+        Log::info("WANS: Mengirim follow-up pembatalan ke user {$userName} untuk produk {$productName}.");
     }
 
-    public function sendAdminNotificationForCancellation($participant)
+    public function sendAdminNotificationForCancellation(Participant $participant)
     {
-        $eventName = Notification::where('event_type', $participant->event_type)->latest()->first()->event ?? 'Event Tidak Ditemukan';
+        $eventName = $participant->notification->event ?? 'Event Tidak Ditemukan';
         $affiliateName = User::where('username', $participant->affiliate_id)->first()->name ?? 'Tanpa Afiliasi';
 
         $adminMessage = "❌ *Transaksi Dibatalkan/Gagal* ❌\n\n" .
             "Transaksi untuk acara *{$eventName}* telah dibatalkan atau gagal.\n\n" .
             "Nama Peserta: *{$participant->name}*\n" .
             "No. WhatsApp: *{$participant->whatsapp}*\n" .
-            "Order ID: *{$participant->order_id}*\n" .
-            "Pengundang: *{$affiliateName}*";
+            "Order ID: *{$participant->order_id}*\n";
 
-        // Mengambil nomor admin dari konfigurasi yang sudah di-parse ke array
         $adminNumbers = config('services.admin.whatsapp', ['082245342997']);
 
-        // Loop untuk setiap nomor admin dan kirim pesan terpisah
         foreach ($adminNumbers as $number) {
             if (!empty(trim($number))) {
                 $this->sendToStarsender(['messageType' => 'text', 'to' => trim($number), 'body' => $adminMessage]);
             }
         }
-        Log::info("WANS: Sent cancellation admin notification for orderId {$participant->order_id}.");
+        Log::info("WANS: Mengirim notifikasi pembatalan ke admin untuk orderId {$participant->order_id}.");
     }
 
     public function sendProductPurchaseSuccessNotification(Order $order)
@@ -392,16 +585,14 @@ class WhatsAppNotificationService
             return;
         }
 
-        // Mengambil nomor admin dari konfigurasi yang sudah di-parse ke array
         $adminWhatsappNumbers = config('services.admin.whatsapp', ['082245342997']);
-        // Menggabungkan untuk tampilan pesan (format "nomor1 atau nomor2")
         $adminPhoneNumberForDisplay = implode(' atau ', array_filter(array_map('trim', $adminWhatsappNumbers)));
         if (empty($adminPhoneNumberForDisplay)) {
-            $adminPhoneNumberForDisplay = '082245342997'; // Fallback jika array kosong
+            $adminPhoneNumberForDisplay = '082245342997';
         }
 
         $message = "✅ *Pembayaran Berhasil*\n\n" .
-            "Halo {$user->name},\n\n" .
+            "Halo Kak {$user->name},\n\n" .
             "Terima kasih! Pembayaran Anda untuk produk *{$product->name}* telah kami terima.\n\n" .
             "Detail produk atau link download akan segera kami proses.\n\n" .
             "Jika ada pertanyaan, hubungi kami di {$adminPhoneNumberForDisplay}.\n\n" .
@@ -411,9 +602,6 @@ class WhatsAppNotificationService
         Log::info("WANS: Mengirim notifikasi pembelian produk berhasil ke user {$user->id}.");
     }
 
-    /**
-     * Mengirim notifikasi ke admin jika ada pembelian produk baru.
-     */
     public function sendAdminNotificationForProductOrder(Order $order)
     {
         $user = $order->user;
@@ -432,10 +620,8 @@ class WhatsAppNotificationService
             "- No. WA: *{$user->whatsapp}*\n\n" .
             "Mohon segera diproses.";
 
-        // Mengambil nomor admin dari konfigurasi yang sudah di-parse ke array
         $adminNumbers = config('services.admin.whatsapp', ['082245342997']);
 
-        // Loop untuk setiap nomor admin dan kirim pesan terpisah
         foreach ($adminNumbers as $number) {
             if (!empty(trim($number))) {
                 $this->sendToStarsender(['messageType' => 'text', 'to' => trim($number), 'body' => $adminMessage]);
@@ -447,12 +633,11 @@ class WhatsAppNotificationService
     public function sendToStarsender(array $messageData)
     {
         $curl = curl_init();
-
         $apiKey = config('services.starsender.api_key');
         $apiUrl = config('services.starsender.url');
 
         if (empty($apiKey) || empty($apiUrl)) {
-            Log::error('WANS: Starsender URL or API Key is not configured. Please check config/services.php and your .env file.');
+            Log::error('WANS: Starsender URL atau API Key tidak dikonfigurasi.');
             return;
         }
 
@@ -461,10 +646,7 @@ class WhatsAppNotificationService
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST => 'POST',
             CURLOPT_POSTFIELDS => json_encode($messageData),
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Authorization: ' . $apiKey,
-            ],
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: ' . $apiKey,],
         ]);
 
         $response = curl_exec($curl);

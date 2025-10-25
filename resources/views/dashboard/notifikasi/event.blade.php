@@ -1,21 +1,17 @@
-<!-- resources/views/dashboard/produk/index.blade.php -->
+@php
+    use Carbon\Carbon;
+    use Illuminate\Support\Facades\Auth;
+    \Carbon\Carbon::setLocale('id');
+
+    // Mengambil data pengguna yang sedang login
+    $user = Auth::user();
+@endphp
 
 @extends('layouts.admin')
 
-@section('title', 'Landing Page Management')
+@section('title', 'Funnel Pendaftaran Event')
 
 @section('content')
-
-    @php
-        use App\Models\Product;
-        use Illuminate\Support\Facades\Auth;
-
-        // Mengambil semua produk dari database
-        $products = Product::all();
-
-        // Mengambil data pengguna yang sedang login
-        $user = Auth::user();
-    @endphp
 
     <div class="wrapper">
         @include('dashboard.partials.sidebar')
@@ -33,171 +29,94 @@
                             <li class="nav-item"><a href="#">Follow Up</a></li>
                         </ul>
                     </div>
-                    <div class="container">
-                        <div class="page-category">
-                            <div class="page-inner">
-                                <div class="row">
-                                    <div class="col-md-12">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <div class="d-flex align-items-center">
-                                                    <h4 class="card-title">Follow Up</h4>
-                                                    <button class="btn btn-primary btn-round ms-auto" data-bs-toggle="modal"
-                                                        data-bs-target="#addRowModal">
-                                                        <i class="fa fa-plus"></i>
-                                                        Add Row
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div class="card-body">
-                                                <!-- Modal -->
-                                                <div class="modal fade" id="addRowModal" tabindex="-1" role="dialog"
-                                                    aria-hidden="true">
-                                                    <div class="modal-dialog" role="document">
-                                                        <div class="modal-content">
-                                                            <div class="modal-header border-0">
-                                                                <h5 class="modal-title">
-                                                                    <span class="fw-mediumbold"> New</span>
-                                                                    <span class="fw-light"> Row </span>
-                                                                </h5>
-                                                                <button type="button" class="close" data-dismiss="modal"
-                                                                    aria-label="Close">
-                                                                    <span aria-hidden="true">&times;</span>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="card-title">Funnel Link Afiliasi</div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Nama Event</th>
+                                                    <th>Hari</th>
+                                                    <th>Tanggal</th>
+                                                    <th>Jam</th>
+                                                    <th>Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @forelse($notifications as $notification)
+                                                    <tr>
+                                                        <td>{{ $notification->id }}</td>
+                                                        <td>{{ $notification->event }}</td>
+                                                        <td>{{ \Carbon\Carbon::parse($notification->event_date)->translatedFormat('l') }}
+                                                        </td>
+                                                        <td>{{ \Carbon\Carbon::parse($notification->event_date)->translatedFormat('d F Y') }}
+                                                        </td>
+                                                        <td>{{ date('H.i', strtotime($notification->event_time)) }} WIB</td>
+                                                        <td>
+                                                            @if ($notification->event_type === 'webinar')
+                                                                <button type="button"
+                                                                    class="btn btn-primary btn-sm copy-link"
+                                                                    data-link="{{ route('webinar.index', ['notification' => $notification->id, 'affiliate_id' => Auth::user()->username]) }}">
+                                                                    Copy Link
                                                                 </button>
-                                                            </div>
-                                                            <div class="modal-body">
-                                                                <p class="small">
-                                                                    Create a new row using this form, make sure you
-                                                                    fill them all
-                                                                </p>
-                                                                <form action="submit" method="POST">
-                                                                    @csrf
-                                                                    <div class="modal-body">
-                                                                                                                                                <!-- Nama Event -->
-                                                                        <div class="form-group">
-                                                                            <label for="name">Follow Up</label>
-                                                                            <input type="text" class="form-control" id="event" name="event"
-                                                                                placeholder="Nama Follow up" required />
-                                                                        </div>
-                                                                        <div class="form-group">
-                                                                            <label for="name">Pesan</label>
-                                                                            <input type="text" class="form-control" id="event" name="event"
-                                                                                placeholder="Masukkan Pesan Follow up" required />
-                                                                        </div>
-
-                                                                        <div class="form-group">
-                                                                            <label for="event_time">Hari Follow Up</label>
-                                                                            <input type="number" class="form-control" id="event_time"
-                                                                                name="event_time" placeholder="Follow up in Days" required />
-                                                                        </div>
-                                                                    </div>
-
-                                                                    <div class="modal-footer">
-                                                                        <button type="button" class="btn btn-secondary"
-                                                                            data-bs-dismiss="modal">Tutup</button>
-                                                                        <button type="submit" class="btn btn-primary">Simpan</button>
-                                                                    </div>
-                                                                </form>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div class="table-responsive">
-                                                    <table id="add-row" class="display table table-striped table-hover">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Nama Reminder</th>
-                                                                <th>Hari</th>
-                                                                <th>Pesan Follow up</th>
-                                                                <th style="width: 10%">Action</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-
-                                                            <tr>
-                                                                <td>Colleen Hurst</td>
-                                                                <td>Javascript Developer</td>
-                                                                <td>San Francisco</td>
-                                                                <td>
-                                                                    <div class="form-button-action">
-                                                                        <button type="button" data-bs-toggle="tooltip"
-                                                                            title=""
-                                                                            class="btn btn-link btn-primary btn-lg"
-                                                                            data-original-title="Edit Task">
-                                                                            <i class="fa fa-edit"></i>
-                                                                        </button>
-                                                                        <button type="button" data-bs-toggle="tooltip"
-                                                                            title="" class="btn btn-link btn-danger"
-                                                                            data-original-title="Remove">
-                                                                            <i class="fa fa-times"></i>
-                                                                        </button>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>Sonya Frost</td>
-                                                                <td>Software Engineer</td>
-                                                                <td>Edinburgh</td>
-                                                                <td>
-                                                                    <div class="form-button-action">
-                                                                        <button type="button" data-bs-toggle="tooltip"
-                                                                            title=""
-                                                                            class="btn btn-link btn-primary btn-lg"
-                                                                            data-original-title="Edit Task">
-                                                                            <i class="fa fa-edit"></i>
-                                                                        </button>
-                                                                        <button type="button" data-bs-toggle="tooltip"
-                                                                            title="" class="btn btn-link btn-danger"
-                                                                            data-original-title="Remove">
-                                                                            <i class="fa fa-times"></i>
-                                                                        </button>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        </div>
+                                                            @elseif($notification->event_type === 'workshop')
+                                                                <button type="button"
+                                                                    class="btn btn-primary btn-sm copy-link"
+                                                                    data-link="{{ route('workshop.index', ['notification' => $notification->id, 'affiliate_id' => Auth::user()->username]) }}">
+                                                                    Copy Link
+                                                                </button>
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                @empty
+                                                    <tr>
+                                                        <td colspan="6" class="text-center">Tidak ada Event yang
+                                                            tersedia.</td>
+                                                    </tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    {{-- Script untuk Copy Link --}}
+                    <script>
+                        document.querySelectorAll('.copy-link').forEach(function(button) {
+                            button.addEventListener('click', function() {
+                                var link = this.getAttribute('data-link');
+                                navigator.clipboard.writeText(link).then(function() {
+                                    swal({
+                                        title: "Berhasil Disalin!",
+                                        text: "Link afiliasi telah berhasil disalin.",
+                                        icon: "success",
+                                        buttons: {
+                                            confirm: {
+                                                text: "OK",
+                                                className: "btn btn-success"
+                                            }
+                                        }
+                                    });
+                                }).catch(function() {
+                                    swal("Gagal", "Link tidak bisa disalin.", "error");
+                                });
+                            });
+                        });
+                    </script>
                 </div>
             </div>
             @include('dashboard.partials.footer')
         </div>
     </div>
-    <script>
-        // Menargetkan semua tombol dengan kelas .view-btn
-        $(".view-btn").click(function(e) {
-            swal("This modal will disappear soon!", {
-                buttons: false,
-                timer: 3000, // Waktu modal akan hilang setelah 3 detik
-            });
-        });
-
-        $(".aff-btn").click(function(e) {
-            swal({
-                title: "Copied!",
-                text: "Link berhasil di copy!",
-                icon: "success",
-                buttons: {
-                    confirm: {
-                        text: "Oke",
-                        value: true,
-                        visible: true,
-                        className: "btn btn-success",
-                        closeModal: true,
-                    },
-                },
-            });
-        });
-    </script>
-
-
     @include('dashboard.partials.scripts')
+
 
 @endsection

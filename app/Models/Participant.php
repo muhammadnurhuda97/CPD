@@ -9,11 +9,6 @@ class Participant extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'business',
@@ -22,26 +17,40 @@ class Participant extends Model
         'city',
         'affiliate_id',
         'event_type',
-        'payment_status', // Cukup satu
-        'order_id',       // Untuk menyimpan ID order Midtrans
-        'is_paid',        // Flag lunas
+        'notification_id',
+        'payment_status',
+        'order_id',
+        'is_paid',
+        'notified_registered',
+        'notified_unpaid',
+        'notified_paid',
+        'reminder_scheduled',
+        'paid_reminder_scheduled',
+        'post_event_reminder_scheduled',
     ];
 
-    /**
-     * Relasi ke tabel Transaction.
-     * Seorang peserta bisa memiliki banyak transaksi (jika ada retry pembayaran).
-     */
-    public function transactions()
+    public function notification()
     {
-        return $this->hasMany(Transaction::class);
+        return $this->belongsTo(Notification::class);
     }
 
     /**
-     * Relasi ke model Notification untuk mendapatkan detail harga event.
-     * Pastikan model Notification Anda ada dan memiliki data yang relevan.
+     * Accessor untuk mendapatkan username affiliate secara dinamis.
+     * Ini membuat kita bisa memanggil $participant->affiliate_username di view.
      */
-    public function notificationEvent()
+    public function getAffiliateUsernameAttribute()
     {
-        return $this->belongsTo(Notification::class, 'event_type', 'event_type');
+        // Jika affiliate_id adalah angka, cari user berdasarkan ID.
+        if (is_numeric($this->affiliate_id)) {
+            $user = User::find($this->affiliate_id);
+            return $user ? $user->username : 'N/A';
+        }
+
+        // Jika bukan angka (berarti teks/username dari data lama), langsung kembalikan.
+        return $this->affiliate_id;
+    }
+    public function affiliateUser()
+    {
+        return $this->belongsTo(User::class, 'affiliate_id');
     }
 }

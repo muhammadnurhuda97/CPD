@@ -246,9 +246,9 @@
                             {{ $transactionInfo['id'] ?? 'N/A' }}
                         </div>
                         <div class="complement">Terima kasih!</div>
-                        <div class="text-center">
+                        {{--  <div class="text-center">
                             <a href="/" class="btn btn-primary">Kembali ke Beranda</a>
-                        </div>
+                        </div>  --}}
                     </div>
 
                 </div>

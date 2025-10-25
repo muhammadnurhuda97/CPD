@@ -5,6 +5,10 @@ namespace App\Console;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use App\Jobs\CheckMidtransTransactionStatus;
+use App\Jobs\CheckPaymentStatusAndNotify;
+use App\Jobs\SendUnpaidWorkshopReminder;
+use App\Jobs\SendWhatsAppReminder;
+
 
 
 class Kernel extends ConsoleKernel

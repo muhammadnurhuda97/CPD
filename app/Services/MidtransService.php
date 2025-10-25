@@ -28,9 +28,11 @@ class MidtransService
      * @param string $orderId
      * @param float $grossAmount
      * @param array $customerDetails
+     * @param string $itemName Nama item yang akan ditampilkan di halaman pembayaran
      * @return string|null
      */
-    public function createTransaction(string $orderId, float $grossAmount, array $customerDetails): ?string
+    // ===== PERUBAHAN DI SINI: Menambahkan parameter $itemName =====
+    public function createTransaction(string $orderId, float $grossAmount, array $customerDetails, string $itemName = 'Pembelian'): ?string
     {
         $transactionDetails = [
             'order_id' => $orderId,
@@ -39,10 +41,11 @@ class MidtransService
 
         $itemDetails = [
             [
-                'id' => 'item1',
+                'id' => 'item1', // Bisa juga menggunakan ID produk/event jika ada
                 'price' => $grossAmount,
                 'quantity' => 1,
-                'name' => 'Pendaftaran Event',
+                // ===== PERUBAHAN DI SINI: Menggunakan nama item dinamis =====
+                'name' => $itemName,
             ],
         ];
 

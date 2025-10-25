@@ -12,6 +12,7 @@ class Notification extends Model
     protected $fillable = [
         'user_id',
         'event',
+        'event_city',
         'event_type',
         'event_date', // Tambahkan ini
         'event_time', // Tambahkan ini
