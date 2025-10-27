@@ -9,6 +9,7 @@ use App\Models\User;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ParticipantsExport;
 use App\Exports\UsersExport;
+use Illuminate\Support\Facades\Log;
 
 class MemberController extends Controller
 {
@@ -186,5 +187,71 @@ class MemberController extends Controller
     public function exportUsersCSV()
     {
         return Excel::download(new UsersExport, 'users.csv');
+    }
+
+    public function commissionReport(Request $request)
+    {
+        $referrals = Participant::whereNotNull('referred_by_participant_id')
+            ->whereHas('notification', function ($query) {
+                $query->where('is_paid', true); // Tetap hanya dari event berbayar
+            })
+            ->with([
+                'notification',
+                'referrer' => function ($query) {
+                    $query->with('affiliateUser');
+                },
+            ])
+            ->latest('created_at')
+            ->paginate(25);
+
+        // Kirim data ke view
+        return view('dashboard.peserta.commissions', compact('referrals'));
+    }
+
+    // ===== AWAL METHOD BARU UNTUK AKSI =====
+    /**
+     * Menyetujui referral (biasanya untuk pembayaran tunai).
+     */
+    public function approveReferral(Participant $participant)
+    {
+        // Validasi dasar: pastikan memang perlu diapprove
+        if ($participant->payment_status === 'pending_cash_verification' || $participant->payment_method === 'cash') {
+            $participant->payment_status = 'paid';
+            $participant->is_paid = 1; // Pastikan flag is_paid juga diupdate
+            $participant->save();
+
+            Log::info('Referral approved manually (Cash Payment Confirmed)', ['participant_id' => $participant->id, 'order_id' => $participant->order_id]);
+
+            // Opsional: Trigger notifikasi WA lunas di sini jika belum terkirim
+            // $waService = app(WhatsAppNotificationService::class);
+            // $waService->sendPaidConfirmation($participant);
+            // $waService->sendAdminNotification($participant, $participant->event_type); // Sesuaikan jika perlu
+            // ... (notif ke affiliate/referrer)
+
+            return redirect()->route('admin.commissions.report')->with('success', 'Pembayaran tunai berhasil dikonfirmasi.');
+        }
+
+        Log::warning('Attempted to approve referral with unsuitable status', ['participant_id' => $participant->id, 'status' => $participant->payment_status]);
+        return redirect()->route('admin.commissions.report')->with('error', 'Status referral tidak sesuai untuk disetujui.');
+    }
+
+    /**
+     * Membatalkan referral.
+     */
+    public function cancelReferral(Participant $participant)
+    {
+        // Hanya batalkan jika belum lunas
+        if ($participant->payment_status !== 'paid') {
+            $participant->payment_status = 'failed'; // Atau 'cancelled', sesuaikan
+            // 'is_paid' tetap 0
+            $participant->save();
+
+            Log::info('Referral cancelled manually', ['participant_id' => $participant->id, 'order_id' => $participant->order_id]);
+
+            return redirect()->route('admin.commissions.report')->with('success', 'Referral berhasil dibatalkan.');
+        }
+
+        Log::warning('Attempted to cancel an already paid referral', ['participant_id' => $participant->id]);
+        return redirect()->route('admin.commissions.report')->with('error', 'Referral yang sudah lunas tidak dapat dibatalkan.');
     }
 }

@@ -67,4 +67,9 @@ class User extends Authenticatable
     {
         return $this->address && $this->city && $this->zip && $this->whatsapp && $this->dob;
     }
+    // Relasi ke participants yang diajak oleh user ini (sebagai affiliate)
+    public function participants()
+    {
+        return $this->hasMany(Participant::class, 'affiliate_id');
+    }
 }

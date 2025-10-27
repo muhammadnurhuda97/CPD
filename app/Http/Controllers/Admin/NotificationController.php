@@ -66,6 +66,8 @@ class NotificationController extends Controller
         $notification->location_address = $validated['location_address'] ?? null;
         $notification->is_paid = $request->has('is_paid') ? 1 : 0;
         $notification->price = $request->is_paid == 1 ? $validated['price'] : null;
+        $notification->referral_discount_amount = $validated['referral_discount_amount'] ?? 0;
+        $notification->participant_referral_commission = $validated['participant_referral_commission'] ?? 0;
         $notification->save();
 
         return redirect()->route('notifikasi.index')->with('success', 'Notifikasi berhasil ditambahkan.');
@@ -86,6 +88,8 @@ class NotificationController extends Controller
             'event_date' => 'required|date',
             'event_time' => 'required|date_format:H:i',
             'banner' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'referral_discount_amount' => 'nullable|numeric|min:0',
+            'participant_referral_commission' => 'nullable|numeric|min:0',
         ];
 
         // BARU: Tambahkan aturan validasi untuk event_city
@@ -115,14 +119,14 @@ class NotificationController extends Controller
 
         // BARU: Simpan event_city
         $notification->event_city = $validated['event_city'] ?? null;
-
         $notification->zoom = $request->event_type === 'webinar' ? $validated['zoom'] : null;
         $notification->location = $request->event_type === 'workshop' ? $validated['location'] : null;
         $notification->location_name = $request->event_type === 'workshop' ? $validated['location_name'] : null;
         $notification->location_address = $request->event_type === 'workshop' ? $validated['location_address'] : null;
-
         $notification->is_paid = $request->has('is_paid') ? 1 : 0;
         $notification->price = $notification->is_paid ? $validated['price'] : null;
+        $notification->referral_discount_amount = $validated['referral_discount_amount'] ?? 0;
+        $notification->participant_referral_commission = $validated['participant_referral_commission'] ?? 0;
 
         // Jika ada file banner baru diupload
         if ($request->hasFile('banner')) {

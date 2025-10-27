@@ -376,4 +376,108 @@ class PaymentController extends Controller
         }
         return $details;
     }
+
+    public function showPaymentChoice(Participant $participant)
+    {
+        // Eager load relasi notification (event)
+        $participant->load('notification');
+
+        if (!$participant->notification) {
+            Log::error('showPaymentChoice: Notification not found for participant.', ['participant_id' => $participant->id]);
+            abort(404, 'Detail event tidak ditemukan.');
+        }
+
+        if (!$participant->notification->is_paid) {
+            Log::warning('showPaymentChoice: Attempted to access payment choice for a free event.', ['participant_id' => $participant->id]);
+            // Jika event gratis, arahkan ke halaman sukses saja
+            return redirect()->route('participant.success', ['participant' => $participant->id]);
+        }
+
+        // Jika sudah pernah memilih atau sudah lunas, redirect sesuai status
+        if ($participant->payment_status === 'paid') {
+            Log::info('showPaymentChoice: Participant already paid.', ['participant_id' => $participant->id]);
+            return redirect()->route('payment.success', ['order_id' => $participant->order_id]); // Asumsi order_id sudah ada
+        }
+        if ($participant->payment_method === 'cash' && $participant->payment_status === 'pending_cash_verification') {
+            Log::info('showPaymentChoice: Participant chose cash, redirecting to cash instructions.', ['participant_id' => $participant->id]);
+            return redirect()->route('payment.cash.instructions', ['participant' => $participant->id]); // Rute ini akan dibuat nanti
+        }
+        // Bisa ditambahkan pengecekan untuk redirect ke Midtrans jika sudah memilih 'midtrans' dan belum bayar
+
+        Log::info('showPaymentChoice: Displaying payment choice page.', ['participant_id' => $participant->id]);
+        return view('payment.choice', compact('participant'));
+    }
+
+    /**
+     * Memproses pilihan metode pembayaran dari user.
+     */
+    public function selectPaymentMethod(Request $request, Participant $participant)
+    {
+        $request->validate([
+            'payment_method' => 'required|in:midtrans,cash',
+        ]);
+
+        $method = $request->input('payment_method');
+        Log::info('selectPaymentMethod: Processing payment method selection.', ['participant_id' => $participant->id, 'method' => $method]);
+
+        $participant->load('notification'); // Pastikan data event ada
+        if (!$participant->notification || !$participant->notification->is_paid) {
+            Log::error('selectPaymentMethod: Invalid event data or free event.', ['participant_id' => $participant->id]);
+            return redirect()->route('payment.error.page')->with('message', 'Event tidak valid untuk pemilihan pembayaran.');
+        }
+
+
+        // Update data peserta
+        $participant->payment_method = $method;
+        if ($method === 'cash') {
+            $participant->payment_status = 'pending_cash_verification';
+        } else {
+            // Untuk Midtrans, status akan diupdate saat initiatePayment atau dari webhook
+            // Kita bisa set ke 'pending' di sini jika mau, tapi initiatePayment juga akan melakukannya
+            $participant->payment_status = 'pending';
+        }
+        $participant->save();
+
+        // Arahkan ke langkah selanjutnya
+        if ($method === 'cash') {
+            Log::info('selectPaymentMethod: Redirecting to cash payment instructions.', ['participant_id' => $participant->id]);
+            // Redirect ke halaman instruksi bayar tunai (akan dibuat di step berikutnya)
+            return redirect()->route('payment.cash.instructions', ['participant' => $participant->id]);
+        } else {
+            // Redirect ke proses inisiasi Midtrans
+            Log::info('selectPaymentMethod: Redirecting to Midtrans initiation.', ['participant_id' => $participant->id]);
+            return redirect()->route('payment.initiate', [
+                'type' => 'event',
+                'identifier' => $participant->id,
+                'price' => $participant->notification->price // Ambil harga dari event
+            ]);
+        }
+    }
+
+    // ===== AKHIR METHOD BARU =====
+
+    // --- Rute baru untuk halaman instruksi cash (akan dibuat view-nya nanti) ---
+    public function showCashInstructions(Participant $participant)
+    {
+        $participant->load('notification'); // Eager load data event
+
+        // Validasi: Pastikan peserta memang memilih 'cash' dan statusnya sesuai
+        if ($participant->payment_method !== 'cash' || $participant->payment_status !== 'pending_cash_verification') {
+            Log::warning('showCashInstructions: Invalid access attempt.', [
+                'participant_id' => $participant->id,
+                'status' => $participant->payment_status,
+                'method' => $participant->payment_method
+            ]);
+            // Redirect kembali ke halaman pilihan jika status/metode tidak cocok
+            return redirect()->route('payment.choice', ['participant' => $participant->id]);
+        }
+
+        if (!$participant->notification) {
+            Log::error('showCashInstructions: Notification not found.', ['participant_id' => $participant->id]);
+            abort(404, 'Detail event tidak ditemukan.');
+        }
+
+        Log::info('showCashInstructions: Displaying cash instructions.', ['participant_id' => $participant->id]);
+        return view('payment.cash_instructions', compact('participant'));
+    }
 }

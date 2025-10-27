@@ -115,6 +115,26 @@
                                             placeholder="Contoh: 50000" value="{{ old('price', $notification->price) }}"
                                             min="0" />
                                     </div>
+                                    <div class="form-group">
+                                        <label for="referral_discount_amount">Diskon per Referral Peserta (Rp)</label>
+                                        <input type="number" class="form-control" name="referral_discount_amount"
+                                            placeholder="Contoh: 10000 (Kosongkan jika tidak ada)"
+                                            value="{{ old('referral_discount_amount', $notification->referral_discount_amount) }}"
+                                            min="0" />
+                                        <small class="form-text text-muted">Jumlah diskon/cashback untuk peserta yang
+                                            berhasil mengajak temannya.</small>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="participant_referral_commission">Komisi Affiliate dari Referral Peserta
+                                            (Rp)</label>
+                                        <input type="number" class="form-control" name="participant_referral_commission"
+                                            placeholder="Contoh: 5000 (Kosongkan jika tidak ada)"
+                                            value="{{ old('participant_referral_commission', $notification->participant_referral_commission) }}"
+                                            min="0" />
+                                        <small class="form-text text-muted">Komisi tambahan untuk affiliate jika pesertanya
+                                            berhasil mengajak teman.</small>
+                                    </div>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-danger me-2"

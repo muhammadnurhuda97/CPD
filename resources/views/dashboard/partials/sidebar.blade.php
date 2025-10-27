@@ -98,6 +98,16 @@
                      </div>
                  </li>
 
+                 {{-- ===== AWAL MENU BARU (Admin Only) ===== --}}
+                 @if (Auth::check() && Auth::user()->role === 'admin')
+                     <li class="nav-item {{ Request::routeIs('admin.commissions.report') ? 'active' : '' }}">
+                         <a href="{{ route('admin.commissions.report') }}">
+                             <i class="fas fa-hand-holding-usd"></i> {{-- Ganti ikon jika perlu --}}
+                             <p>Laporan Referral</p>
+                         </a>
+                     </li>
+                 @endif
+
                  {{-- BARU DITAMBAHKAN: Catatan Transaksi --}}
                  <li class="nav-item {{ Request::routeIs('transactions.index') ? 'active' : '' }}">
                      <a href="{{ route('transactions.index') }}">

@@ -116,6 +116,28 @@
                                                     <input type="number" class="form-control" id="price"
                                                         name="price" placeholder="Contoh: 50000" min="0" />
                                                 </div>
+                                                <div class="form-group">
+                                                    <label for="referral_discount_amount">Diskon per Referral Peserta
+                                                        (Rp)</label>
+                                                    <input type="number" class="form-control"
+                                                        id="referral_discount_amount" name="referral_discount_amount"
+                                                        placeholder="Contoh: 10000 (Kosongkan jika tidak ada)"
+                                                        min="0" value="0" />
+                                                    <small class="form-text text-muted">Jumlah diskon/cashback untuk
+                                                        peserta yang berhasil mengajak temannya.</small>
+                                                </div>
+
+                                                <div class="form-group">
+                                                    <label for="participant_referral_commission">Komisi Affiliate dari
+                                                        Referral Peserta (Rp)</label>
+                                                    <input type="number" class="form-control"
+                                                        id="participant_referral_commission"
+                                                        name="participant_referral_commission"
+                                                        placeholder="Contoh: 5000 (Kosongkan jika tidak ada)"
+                                                        min="0" value="0" />
+                                                    <small class="form-text text-muted">Komisi tambahan untuk affiliate
+                                                        jika pesertanya berhasil mengajak teman.</small>
+                                                </div>
 
                                                 <div class="form-group" id="locationNameField" style="display: none;">
                                                     <label for="location_name">Nama Tempat</label>

@@ -89,7 +89,12 @@ Route::get('/payment/success', [PaymentController::class, 'paymentSuccess'])->na
 Route::get('/payment/check-status/{orderId}', [PaymentController::class, 'checkPaymentStatus'])->name('payment.checkStatus');
 Route::get('/payment/error', [PaymentController::class, 'paymentErrorPage'])->name('payment.error.page');
 Route::get('/payment/cancel/{orderId}', [PaymentController::class, 'cancelAndRetry'])->name('payment.cancel');
-
+Route::get('/payment-choice/{participant}', [PaymentController::class, 'showPaymentChoice'])
+    ->name('payment.choice');
+Route::post('/payment-choice/{participant}/select', [PaymentController::class, 'selectPaymentMethod'])
+    ->name('payment.select');
+Route::get('/payment/cash/{participant}', [PaymentController::class, 'showCashInstructions'])
+    ->name('payment.cash.instructions');
 
 // Webhook Midtrans
 Route::post('/webhook/midtrans', [PaymentController::class, 'handleMidtransCallback'])
@@ -182,6 +187,11 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::delete('/lead-webinar/{id}', [MemberController::class, 'destroy'])->name('admin.members.destroy.webinar');
     Route::delete('/lead-workshop/{id}', [MemberController::class, 'destroy'])->name('admin.members.destroy.workshop');
     Route::get('/export-members', [MemberController::class, 'exportUsersCSV'])->name('users.csv');
+
+    // Report
+    Route::get('/commissions-report', [MemberController::class, 'commissionReport'])->name('admin.commissions.report');
+    Route::post('/referral/{participant}/approve', [MemberController::class, 'approveReferral'])->name('admin.referral.approve');
+    Route::post('/referral/{participant}/cancel', [MemberController::class, 'cancelReferral'])->name('admin.referral.cancel');
 
     // Upload flyer dan copywriting
     Route::post('/upload-flyer', function (Request $request) {
