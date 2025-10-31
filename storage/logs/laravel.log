@@ -1,92 +1,75 @@
-[2025-10-27 08:37:13] devlopment.INFO: ParticipantController@store: Request received {"name":"chief","business":"sass","email":"kentang99@lechatiao.com","whatsapp":"0895-3932-93767","city":"KULON PROGO","notification_id":"23","affiliate_id":"dindalaila","event_type":"workshop"} 
-[2025-10-27 08:37:13] devlopment.INFO: ===== TIME CHECK START =====  
-[2025-10-27 08:37:13] devlopment.INFO: 1. Waktu Server Saat Ini (WIB): 2025-10-27 08:37:13  
-[2025-10-27 08:37:13] devlopment.INFO: 2. Waktu Event dari DB: 2025-11-01 14:00:00  
-[2025-10-27 08:37:13] devlopment.INFO: 3. Batas Waktu Pendaftaran Dihitung: 2025-11-01 13:30:00  
-[2025-10-27 08:37:13] devlopment.INFO: 4. KEPUTUSAN: PENDAFTARAN DITERIMA. Waktu pendaftaran masih valid.  
-[2025-10-27 08:37:13] devlopment.INFO: ===== TIME CHECK END =====  
-[2025-10-27 08:37:14] devlopment.INFO: DEBUG: ref_p captured from URL {"ref_p_value":null} 
-[2025-10-27 08:37:14] devlopment.INFO: DEBUG: ref_p is not numeric or not present {"ref_p_value":null} 
-[2025-10-27 08:37:14] devlopment.INFO: ParticipantController@store: Affiliate determined from form/session. {"input_affiliate":"dindalaila","affiliate_user_id":31} 
-[2025-10-27 08:37:14] devlopment.INFO: ParticipantController@store: Participant created successfully {"participant_id":798,"order_id":"ORD-WOR-271025-0798-GPL","final_affiliate_id":31} 
-[2025-10-27 08:37:16] devlopment.INFO: WANS: Starsender API response: {"success":true,"data":{"message_id":242820230},"message":"Success sent message"}  
-[2025-10-27 08:37:16] devlopment.INFO: WANS: Menjadwalkan pesan After-Event (H+6 Jam) di Starsender untuk peserta ID 798.  
-[2025-10-27 08:37:16] devlopment.INFO: ParticipantController@store: Paid event. Redirecting to payment choice. {"participant_id":798} 
-[2025-10-27 08:37:16] devlopment.INFO: showPaymentChoice: Displaying payment choice page. {"participant_id":798} 
-[2025-10-27 08:38:02] devlopment.INFO: Job CheckMidtransTransactionStatus: Berjalan...  
-[2025-10-27 08:38:02] devlopment.INFO: Job CheckMidtransTransactionStatus: Tidak ada pesanan produk pending untuk dicek.  
-[2025-10-27 08:38:02] devlopment.INFO: Job CheckMidtransTransactionStatus: Memeriksa 317 peserta event pending.  
-[2025-10-27 08:38:02] devlopment.INFO: Job CheckMidtransTransactionStatus: [Percobaan 1] Memeriksa status Midtrans untuk participant - orderId: ORD-WOR-220625-0043-4H7  
-[2025-10-27 08:38:24] devlopment.ERROR: Job CheckMidtransTransactionStatus: Exception tidak terduga untuk orderId 'ORD-WOR-220625-0043-4H7'. {"message":"CURL Error: Error in the HTTP2 framing layer"} 
-[2025-10-27 08:38:24] devlopment.ERROR: Job CheckMidtransTransactionStatus: Error tidak terduga di metode handle(). {"error":"CURL Error: Error in the HTTP2 framing layer"} 
-[2025-10-27 08:38:24] devlopment.INFO: Job CheckMidtransTransactionStatus: Selesai.  
-[2025-10-27 08:39:03] devlopment.INFO: Job CheckMidtransTransactionStatus: Berjalan...  
-[2025-10-27 08:39:03] devlopment.INFO: Job CheckMidtransTransactionStatus: Tidak ada pesanan produk pending untuk dicek.  
-[2025-10-27 08:39:03] devlopment.INFO: Job CheckMidtransTransactionStatus: Memeriksa 317 peserta event pending.  
-[2025-10-27 08:39:03] devlopment.INFO: Job CheckMidtransTransactionStatus: [Percobaan 1] Memeriksa status Midtrans untuk participant - orderId: ORD-WOR-220625-0043-4H7  
-[2025-10-27 08:39:03] devlopment.WARNING: Job CheckMidtransTransactionStatus: Midtrans mengembalikan 404 untuk orderId 'ORD-WOR-220625-0043-4H7'. Transaksi belum diinisiasi oleh pengguna. Mencoba ulang sesuai jadwal. {"message":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"9e5e81c2-01ab-4929-9d63-612d4ba73ed5\"}"} 
-[2025-10-27 08:39:03] devlopment.ERROR: Job CheckMidtransTransactionStatus: Error tidak terduga di metode handle(). {"error":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"9e5e81c2-01ab-4929-9d63-612d4ba73ed5\"}"} 
-[2025-10-27 08:39:03] devlopment.INFO: Job CheckMidtransTransactionStatus: Selesai.  
-[2025-10-27 08:40:01] devlopment.INFO: Job CheckMidtransTransactionStatus: Berjalan...  
-[2025-10-27 08:40:01] devlopment.INFO: Job CheckMidtransTransactionStatus: Tidak ada pesanan produk pending untuk dicek.  
-[2025-10-27 08:40:01] devlopment.INFO: Job CheckMidtransTransactionStatus: Memeriksa 317 peserta event pending.  
-[2025-10-27 08:40:01] devlopment.INFO: Job CheckMidtransTransactionStatus: [Percobaan 1] Memeriksa status Midtrans untuk participant - orderId: ORD-WOR-220625-0043-4H7  
-[2025-10-27 08:40:09] devlopment.WARNING: Job CheckMidtransTransactionStatus: Midtrans mengembalikan 404 untuk orderId 'ORD-WOR-220625-0043-4H7'. Transaksi belum diinisiasi oleh pengguna. Mencoba ulang sesuai jadwal. {"message":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"97be6cc5-5586-43db-b2c0-5d88e770144c\"}"} 
-[2025-10-27 08:40:09] devlopment.ERROR: Job CheckMidtransTransactionStatus: Error tidak terduga di metode handle(). {"error":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"97be6cc5-5586-43db-b2c0-5d88e770144c\"}"} 
-[2025-10-27 08:40:09] devlopment.INFO: Job CheckMidtransTransactionStatus: Selesai.  
-[2025-10-27 08:41:00] devlopment.INFO: Job CheckMidtransTransactionStatus: Berjalan...  
-[2025-10-27 08:41:00] devlopment.INFO: Job CheckMidtransTransactionStatus: Tidak ada pesanan produk pending untuk dicek.  
-[2025-10-27 08:41:00] devlopment.INFO: Job CheckMidtransTransactionStatus: Memeriksa 317 peserta event pending.  
-[2025-10-27 08:41:00] devlopment.INFO: Job CheckMidtransTransactionStatus: [Percobaan 1] Memeriksa status Midtrans untuk participant - orderId: ORD-WOR-220625-0043-4H7  
-[2025-10-27 08:41:07] devlopment.WARNING: Job CheckMidtransTransactionStatus: Midtrans mengembalikan 404 untuk orderId 'ORD-WOR-220625-0043-4H7'. Transaksi belum diinisiasi oleh pengguna. Mencoba ulang sesuai jadwal. {"message":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"0e618fe1-985d-4fcf-931a-3b17e2c7a545\"}"} 
-[2025-10-27 08:41:07] devlopment.ERROR: Job CheckMidtransTransactionStatus: Error tidak terduga di metode handle(). {"error":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"0e618fe1-985d-4fcf-931a-3b17e2c7a545\"}"} 
-[2025-10-27 08:41:07] devlopment.INFO: Job CheckMidtransTransactionStatus: Selesai.  
-[2025-10-27 08:42:01] devlopment.INFO: Job CheckMidtransTransactionStatus: Berjalan...  
-[2025-10-27 08:42:01] devlopment.INFO: Job CheckMidtransTransactionStatus: Tidak ada pesanan produk pending untuk dicek.  
-[2025-10-27 08:42:01] devlopment.INFO: Job CheckMidtransTransactionStatus: Memeriksa 317 peserta event pending.  
-[2025-10-27 08:42:01] devlopment.INFO: Job CheckMidtransTransactionStatus: [Percobaan 1] Memeriksa status Midtrans untuk participant - orderId: ORD-WOR-220625-0043-4H7  
-[2025-10-27 08:42:02] devlopment.WARNING: Job CheckMidtransTransactionStatus: Midtrans mengembalikan 404 untuk orderId 'ORD-WOR-220625-0043-4H7'. Transaksi belum diinisiasi oleh pengguna. Mencoba ulang sesuai jadwal. {"message":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"4f4acf9b-4be5-4611-bb90-dbd60f704518\"}"} 
-[2025-10-27 08:42:02] devlopment.ERROR: Job CheckMidtransTransactionStatus: Error tidak terduga di metode handle(). {"error":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"4f4acf9b-4be5-4611-bb90-dbd60f704518\"}"} 
-[2025-10-27 08:42:02] devlopment.INFO: Job CheckMidtransTransactionStatus: Selesai.  
-[2025-10-27 08:43:03] devlopment.INFO: Job CheckMidtransTransactionStatus: Berjalan...  
-[2025-10-27 08:43:03] devlopment.INFO: Job CheckMidtransTransactionStatus: Tidak ada pesanan produk pending untuk dicek.  
-[2025-10-27 08:43:03] devlopment.INFO: Job CheckMidtransTransactionStatus: Memeriksa 317 peserta event pending.  
-[2025-10-27 08:43:03] devlopment.INFO: Job CheckMidtransTransactionStatus: [Percobaan 1] Memeriksa status Midtrans untuk participant - orderId: ORD-WOR-220625-0043-4H7  
-[2025-10-27 08:43:04] devlopment.WARNING: Job CheckMidtransTransactionStatus: Midtrans mengembalikan 404 untuk orderId 'ORD-WOR-220625-0043-4H7'. Transaksi belum diinisiasi oleh pengguna. Mencoba ulang sesuai jadwal. {"message":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"3b39c0ed-dc0f-472e-bd1a-c6396e4d184a\"}"} 
-[2025-10-27 08:43:04] devlopment.ERROR: Job CheckMidtransTransactionStatus: Error tidak terduga di metode handle(). {"error":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"3b39c0ed-dc0f-472e-bd1a-c6396e4d184a\"}"} 
-[2025-10-27 08:43:04] devlopment.INFO: Job CheckMidtransTransactionStatus: Selesai.  
-[2025-10-27 08:44:01] devlopment.INFO: Job CheckMidtransTransactionStatus: Berjalan...  
-[2025-10-27 08:44:01] devlopment.INFO: Job CheckMidtransTransactionStatus: Tidak ada pesanan produk pending untuk dicek.  
-[2025-10-27 08:44:01] devlopment.INFO: Job CheckMidtransTransactionStatus: Memeriksa 317 peserta event pending.  
-[2025-10-27 08:44:01] devlopment.INFO: Job CheckMidtransTransactionStatus: [Percobaan 1] Memeriksa status Midtrans untuk participant - orderId: ORD-WOR-220625-0043-4H7  
-[2025-10-27 08:44:02] devlopment.WARNING: Job CheckMidtransTransactionStatus: Midtrans mengembalikan 404 untuk orderId 'ORD-WOR-220625-0043-4H7'. Transaksi belum diinisiasi oleh pengguna. Mencoba ulang sesuai jadwal. {"message":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"e55d3189-4c02-4d1e-bb59-bc4792a25fa6\"}"} 
-[2025-10-27 08:44:02] devlopment.ERROR: Job CheckMidtransTransactionStatus: Error tidak terduga di metode handle(). {"error":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"e55d3189-4c02-4d1e-bb59-bc4792a25fa6\"}"} 
-[2025-10-27 08:44:02] devlopment.INFO: Job CheckMidtransTransactionStatus: Selesai.  
-[2025-10-27 08:45:02] devlopment.INFO: Job CheckMidtransTransactionStatus: Berjalan...  
-[2025-10-27 08:45:02] devlopment.INFO: Job CheckMidtransTransactionStatus: Tidak ada pesanan produk pending untuk dicek.  
-[2025-10-27 08:45:02] devlopment.INFO: Job CheckMidtransTransactionStatus: Memeriksa 317 peserta event pending.  
-[2025-10-27 08:45:02] devlopment.INFO: Job CheckMidtransTransactionStatus: [Percobaan 1] Memeriksa status Midtrans untuk participant - orderId: ORD-WOR-220625-0043-4H7  
-[2025-10-27 08:45:02] devlopment.WARNING: Job CheckMidtransTransactionStatus: Midtrans mengembalikan 404 untuk orderId 'ORD-WOR-220625-0043-4H7'. Transaksi belum diinisiasi oleh pengguna. Mencoba ulang sesuai jadwal. {"message":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"d0f67501-b8d1-4ed3-bae0-538e0a115e9c\"}"} 
-[2025-10-27 08:45:02] devlopment.ERROR: Job CheckMidtransTransactionStatus: Error tidak terduga di metode handle(). {"error":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"d0f67501-b8d1-4ed3-bae0-538e0a115e9c\"}"} 
-[2025-10-27 08:45:02] devlopment.INFO: Job CheckMidtransTransactionStatus: Selesai.  
-[2025-10-27 08:45:05] devlopment.INFO: Job CheckMidtransTransactionStatus: Berjalan...  
-[2025-10-27 08:45:05] devlopment.INFO: Job CheckMidtransTransactionStatus: Tidak ada pesanan produk pending untuk dicek.  
-[2025-10-27 08:45:05] devlopment.INFO: Job CheckMidtransTransactionStatus: Memeriksa 317 peserta event pending.  
-[2025-10-27 08:45:05] devlopment.INFO: Job CheckMidtransTransactionStatus: [Percobaan 2] Memeriksa status Midtrans untuk participant - orderId: ORD-WOR-220625-0043-4H7  
-[2025-10-27 08:45:06] devlopment.WARNING: Job CheckMidtransTransactionStatus: Midtrans mengembalikan 404 untuk orderId 'ORD-WOR-220625-0043-4H7'. Transaksi belum diinisiasi oleh pengguna. Mencoba ulang sesuai jadwal. {"message":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"63a9bceb-b82c-4e03-9b34-16d04d982044\"}"} 
-[2025-10-27 08:45:06] devlopment.ERROR: Job CheckMidtransTransactionStatus: Error tidak terduga di metode handle(). {"error":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"63a9bceb-b82c-4e03-9b34-16d04d982044\"}"} 
-[2025-10-27 08:45:06] devlopment.INFO: Job CheckMidtransTransactionStatus: Selesai.  
-[2025-10-27 08:46:03] devlopment.INFO: Job CheckMidtransTransactionStatus: Berjalan...  
-[2025-10-27 08:46:03] devlopment.INFO: Job CheckMidtransTransactionStatus: Tidak ada pesanan produk pending untuk dicek.  
-[2025-10-27 08:46:03] devlopment.INFO: Job CheckMidtransTransactionStatus: Memeriksa 317 peserta event pending.  
-[2025-10-27 08:46:03] devlopment.INFO: Job CheckMidtransTransactionStatus: [Percobaan 1] Memeriksa status Midtrans untuk participant - orderId: ORD-WOR-220625-0043-4H7  
-[2025-10-27 08:46:03] devlopment.WARNING: Job CheckMidtransTransactionStatus: Midtrans mengembalikan 404 untuk orderId 'ORD-WOR-220625-0043-4H7'. Transaksi belum diinisiasi oleh pengguna. Mencoba ulang sesuai jadwal. {"message":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"7ae36b28-8f85-483d-971a-d6c424d8ba14\"}"} 
-[2025-10-27 08:46:03] devlopment.ERROR: Job CheckMidtransTransactionStatus: Error tidak terduga di metode handle(). {"error":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"7ae36b28-8f85-483d-971a-d6c424d8ba14\"}"} 
-[2025-10-27 08:46:03] devlopment.INFO: Job CheckMidtransTransactionStatus: Selesai.  
-[2025-10-27 08:47:00] devlopment.INFO: Job CheckMidtransTransactionStatus: Berjalan...  
-[2025-10-27 08:47:00] devlopment.INFO: Job CheckMidtransTransactionStatus: Tidak ada pesanan produk pending untuk dicek.  
-[2025-10-27 08:47:00] devlopment.INFO: Job CheckMidtransTransactionStatus: Memeriksa 317 peserta event pending.  
-[2025-10-27 08:47:00] devlopment.INFO: Job CheckMidtransTransactionStatus: [Percobaan 1] Memeriksa status Midtrans untuk participant - orderId: ORD-WOR-220625-0043-4H7  
-[2025-10-27 08:47:01] devlopment.WARNING: Job CheckMidtransTransactionStatus: Midtrans mengembalikan 404 untuk orderId 'ORD-WOR-220625-0043-4H7'. Transaksi belum diinisiasi oleh pengguna. Mencoba ulang sesuai jadwal. {"message":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"2ccd87a1-ae12-49c3-be5c-8d6f451c7be4\"}"} 
-[2025-10-27 08:47:01] devlopment.ERROR: Job CheckMidtransTransactionStatus: Error tidak terduga di metode handle(). {"error":"Midtrans API is returning API error. HTTP status code: 404 API response: {\"status_code\":\"404\",\"status_message\":\"Transaction doesn't exist.\",\"id\":\"2ccd87a1-ae12-49c3-be5c-8d6f451c7be4\"}"} 
-[2025-10-27 08:47:01] devlopment.INFO: Job CheckMidtransTransactionStatus: Selesai.  
+[2025-10-31 22:42:10] devlopment.INFO: ParticipantController@store: Request received {"name":"Monika Sari Ramadhanti","business":"Programmer","email":"ianclark99@lechatiao.com","whatsapp":"0856-0871-5949","city":"KULON PROGO","notification_id":"23","affiliate_id":"dindalaila","event_type":"workshop"} 
+[2025-10-31 22:42:10] devlopment.INFO: ===== TIME CHECK START =====  
+[2025-10-31 22:42:10] devlopment.INFO: 1. Waktu Server Saat Ini (WIB): 2025-10-31 22:42:10  
+[2025-10-31 22:42:10] devlopment.INFO: 2. Waktu Event dari DB: 2025-11-01 14:00:00  
+[2025-10-31 22:42:10] devlopment.INFO: 3. Batas Waktu Pendaftaran Dihitung: 2025-11-01 13:30:00  
+[2025-10-31 22:42:10] devlopment.INFO: 4. KEPUTUSAN: PENDAFTARAN DITERIMA. Waktu pendaftaran masih valid.  
+[2025-10-31 22:42:10] devlopment.INFO: ===== TIME CHECK END =====  
+[2025-10-31 22:42:12] devlopment.WARNING: Invalid ref_p detected {"ref_p":null} 
+[2025-10-31 22:42:12] devlopment.INFO: DEBUG: ref_p captured from URL {"ref_p_value":null} 
+[2025-10-31 22:42:12] devlopment.INFO: DEBUG: ref_p is not numeric or not present {"ref_p_value":null} 
+[2025-10-31 22:42:12] devlopment.INFO: ParticipantController@store: Affiliate determined from form/session. {"input_affiliate":"dindalaila","affiliate_user_id":31} 
+[2025-10-31 22:42:12] devlopment.INFO: ParticipantController@store: Participant created successfully {"participant_id":811,"order_id":"ORD-WOR-311025-0811-4EU","final_affiliate_id":31} 
+[2025-10-31 22:42:12] devlopment.INFO: ParticipantController@store: Paid event. Redirecting to payment choice. {"participant_id":811} 
+[2025-10-31 22:42:12] devlopment.INFO: showPaymentChoice: Displaying payment choice page. {"participant_id":811} 
+[2025-10-31 22:42:17] devlopment.INFO: selectPaymentMethod: Processing payment method selection. {"participant_id":811,"method":"cash"} 
+[2025-10-31 22:42:17] devlopment.DEBUG: WANS: Preparing to send message via Starsender. {"to":"085608715949","body":"🎉 *Pendaftaran Awal Berhasil!* 🎉
+
+Yth. *Monika Sari Ramadhanti*,
+
+Terima kasih telah melakukan pendaftaran awal untuk event:
+✨ *Workshop GME KULON PROGO*
+🗓️ Hari/Tanggal: Saturday, 01 November 2025
+⏰ Waktu: 14.00 WIB
+
+Metode pembayaran Anda (*Cash*) telah kami catat.
+
+Silakan lakukan pembayaran tunai sesuai instruksi di halaman berikutnya.
+
+💡 *Info Menarik:* Gunakan link referral Anda berikut ini untuk mendapatkan *cashback/diskon sebesar Rp 10.000*!
+http://127.0.0.1:8000/registrasi/workshop_id=23?ref_p=811
+
+(Diskon/cashback akan diproses setelah teman Anda mendaftar & lunas, dan pembayaran Anda sendiri terkonfirmasi).
+
+Jika ada pertanyaan, silakan hubungi kami di 082245342997 / 085230491659.
+
+Hormat kami,
+Panitia Event","messageType":"text"} 
+[2025-10-31 22:42:17] devlopment.INFO: WANS: Starsender API response: {"success":true,"data":{"message_id":243947652},"message":"Success sent message"} {"to":"085608715949"} 
+[2025-10-31 22:42:17] devlopment.INFO: WANS: Post-registration message sent to participant 811.  
+[2025-10-31 22:42:17] devlopment.INFO: selectPaymentMethod: Initial post-registration notification sent. {"participant_id":811} 
+[2025-10-31 22:42:17] devlopment.DEBUG: WANS: Preparing to send message via Starsender. {"to":"082245342997","body":"🔔 *Pendaftar Baru (Menunggu Bayar Tunai) - Workshop GME KULON PROGO* 🔔
+
+Nama: *Monika Sari Ramadhanti*
+No. WA: 085608715949
+Order ID: *ORD-WOR-311025-0811-4EU*
+Affiliate: *Dinda laila R* (085733756077)
+
+*Aksi Diperlukan:* Konfirmasi pembayaran tunai di Laporan Referral.","messageType":"text"} 
+[2025-10-31 22:42:17] devlopment.INFO: WANS: Starsender API response: {"success":true,"data":{"message_id":243947653},"message":"Success sent message"} {"to":"082245342997"} 
+[2025-10-31 22:42:17] devlopment.DEBUG: WANS: Preparing to send message via Starsender. {"to":"085230491659","body":"🔔 *Pendaftar Baru (Menunggu Bayar Tunai) - Workshop GME KULON PROGO* 🔔
+
+Nama: *Monika Sari Ramadhanti*
+No. WA: 085608715949
+Order ID: *ORD-WOR-311025-0811-4EU*
+Affiliate: *Dinda laila R* (085733756077)
+
+*Aksi Diperlukan:* Konfirmasi pembayaran tunai di Laporan Referral.","messageType":"text"} 
+[2025-10-31 22:42:17] devlopment.INFO: WANS: Starsender API response: {"success":true,"data":{"message_id":243947654},"message":"Success sent message"} {"to":"085230491659"} 
+[2025-10-31 22:42:17] devlopment.INFO: WANS: Admin notification sent for participant 811. Status: Menunggu Bayar Tunai  
+[2025-10-31 22:42:17] devlopment.INFO: selectPaymentMethod: Initial Admin notification sent. {"participant_id":811} 
+[2025-10-31 22:42:17] devlopment.DEBUG: WANS: Preparing to send message via Starsender. {"to":"085733756077","body":"🎉 *Lead Baru, Dinda laila R!* 🎉
+
+Anda mendapatkan lead baru untuk event *Workshop GME KULON PROGO*:
+- Nama: *Monika Sari Ramadhanti*
+- WhatsApp: 085608715949
+- Kota: KULON PROGO
+- Status Pembayaran: *Menunggu Bayar Tunai*
+
+Jangan lupa follow up ya! 💪","messageType":"text"} 
+[2025-10-31 22:42:18] devlopment.INFO: WANS: Starsender API response: {"success":true,"data":{"message_id":243947655},"message":"Success sent message"} {"to":"085733756077"} 
+[2025-10-31 22:42:18] devlopment.INFO: WANS: Affiliate notification sent to Dinda laila R for participant 811. Status: Menunggu Bayar Tunai  
+[2025-10-31 22:42:18] devlopment.INFO: selectPaymentMethod: Initial Affiliate notification sent. {"participant_id":811,"affiliate_id":"31"} 
+[2025-10-31 22:42:18] devlopment.INFO: selectPaymentMethod: Participant status and notification flags saved. {"participant_id":811} 
+[2025-10-31 22:42:18] devlopment.INFO: selectPaymentMethod: Redirecting to cash payment instructions. {"participant_id":811} 
+[2025-10-31 22:42:18] devlopment.INFO: showCashInstructions: Displaying cash instructions. {"participant_id":811} 

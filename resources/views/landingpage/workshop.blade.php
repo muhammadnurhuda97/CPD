@@ -206,8 +206,19 @@
                                 <li>Pelajari Strategi Sukses dari Internet Millionaire</li>
                             </ul>
                             {{-- DIUBAH: Link pendaftaran sekarang menyertakan ID notifikasi yang spesifik --}}
-                            <a href="{{ route('workshop.form', ['notification' => $notification->id, 'affiliate_id' => $affiliateId]) }}"
-                                class="black-btn">Daftar Sekarang</a>
+                            @php
+                                // Siapkan parameter dasar untuk rute form
+                                $formRouteParams = [
+                                    'notification' => $notification->id,
+                                    'affiliate_id' => $affiliateId, // Sertakan affiliate_id jika perlu
+                                ];
+                                // Jika $ref_p ada dari controller landing page, tambahkan ke parameter
+                                if (isset($ref_p) && !empty($ref_p)) {
+                                    $formRouteParams['ref_p'] = $ref_p;
+                                }
+                            @endphp
+                            <a href="{{ route('workshop.form', $formRouteParams) }}" class="black-btn">Daftar
+                                Sekarang</a>
                         </div>
                     </div>
                 </div>

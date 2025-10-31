@@ -27,19 +27,22 @@ class SendUnpaidWorkshopReminder implements ShouldQueue
         $participant = Participant::find($this->participantId);
 
         if (!$participant) {
-            Log::warning("JobReminder: Peserta ID {$this->participantId} tidak ditemukan.");
+            Log::warning("JobReminder: Peserta ID {$this->participantId} tidak ditemukan (SendUnpaidWorkshopReminder).");
             return;
         }
 
         // Pengecekan final tepat sebelum mengirim
-        if ($participant->payment_status === 'paid') {
-            Log::info("JobReminder: Peserta ID {$this->participantId} sudah lunas. Tidak mengirim reminder tunai.");
+        // Perbaiki pengecekan status: jangan kirim jika sudah lunas ATAU jika metodenya bukan workshop
+        if ($participant->is_paid || $participant->payment_status === 'paid' || $participant->event_type !== 'workshop') {
+            Log::info("JobReminder: Peserta ID {$this->participantId} sudah lunas atau bukan workshop. Tidak mengirim reminder unpaid.");
             return;
         }
 
-        // PERBAIKAN: Memastikan Job memanggil fungsi yang benar untuk MENGIRIM PESAN.
-        $waService->sendUnpaidWorkshopReminderMessage($participant);
+        // --- PERBAIKAN PEMANGGILAN FUNGSI ---
+        // $waService->sendUnpaidWorkshopReminderMessage($participant); // <-- SALAH (jika ini dari kode Anda)
+        $waService->sendUnpaidReminder($participant); // <-- BENAR
+        // ------------------------------------
 
-        Log::info("JobReminder: Proses pengiriman reminder pembayaran tunai H-2 Jam untuk Peserta ID {$this->participantId} selesai.");
+        Log::info("JobReminder: Proses pengiriman reminder unpaid workshop untuk Peserta ID {$this->participantId} selesai.");
     }
 }

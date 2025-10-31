@@ -12,8 +12,19 @@ use App\Models\User;
 use App\Jobs\CheckPaymentStatusAndNotify;
 use Illuminate\Support\Str; // Pastikan Str di-import
 
+
 class ParticipantController extends Controller
 {
+    public function showForm(Request $request, Notification $notification)
+    {
+        // Ambil ref_p DARI URL HALAMAN INI
+        $ref_p = $request->query('ref_p');
+        // Ambil affiliate_id dari URL atau session jika perlu di form
+        $affiliateId = $request->query('affiliate_id') ?? session('affiliate_id');
+
+        // Kirim $notification dan $ref_p ke view form
+        return view('participants.form', compact('notification', 'ref_p', 'affiliateId'));
+    }
     public function store(Request $request, WhatsAppNotificationService $waService)
     {
         Log::info('ParticipantController@store: Request received', $request->except('password', '_token'));
@@ -90,19 +101,32 @@ class ParticipantController extends Controller
         ]);
 
         // --- Tangkap Referral Peserta ---
-        $referred_by_id = $request->query('ref_p');
+        $referred_by_id = $request->input('ref_p');
+        if (!is_numeric($referred_by_id)) {
+            Log::warning('Invalid ref_p detected', ['ref_p' => $referred_by_id]);
+            $referred_by_id = null;
+        }
+
         Log::info('DEBUG: ref_p captured from URL', ['ref_p_value' => $referred_by_id]);
 
         $referrerParticipant = null;
-        if (is_numeric($referred_by_id)) {
-            Log::info('DEBUG: Attempting to find referrer', ['id' => $referred_by_id, 'notification_id' => $notificationId]); // <-- LOG 2
+        if ($referred_by_id) {
+            Log::info('DEBUG: Attempting to find referrer', [
+                'id' => $referred_by_id,
+                'notification_id' => $notificationId
+            ]);
+
             $referrerParticipant = Participant::where('id', $referred_by_id)
                 ->where('notification_id', $notificationId)
                 ->first();
+
             if ($referrerParticipant) {
-                Log::info('DEBUG: Referrer FOUND', ['referrer_id' => $referrerParticipant->id]); // <-- LOG 3 (Seharusnya muncul jika valid)
+                Log::info('DEBUG: Referrer FOUND', ['referrer_id' => $referrerParticipant->id]);
             } else {
-                Log::warning('DEBUG: Referrer NOT FOUND or wrong event', ['searched_id' => $referred_by_id, 'event_id' => $notificationId]); // <-- LOG 4 (Akan muncul jika tidak valid)
+                Log::warning('DEBUG: Referrer NOT FOUND or wrong event', [
+                    'searched_id' => $referred_by_id,
+                    'event_id' => $notificationId
+                ]);
             }
         } else {
             Log::info('DEBUG: ref_p is not numeric or not present', ['ref_p_value' => $referred_by_id]); // <-- LOG 5
@@ -168,21 +192,15 @@ class ParticipantController extends Controller
 
         Log::info('ParticipantController@store: Participant created successfully', ['participant_id' => $participant->id, 'order_id' => $participant->order_id, 'final_affiliate_id' => $finalAffiliateId]);
 
-
-        // --- Kirim Notifikasi WA Awal ---
-        // (Anda mungkin perlu memodifikasi $waService->sendPostEventMessage agar pesan sesuai status)
-        $waService->sendPostEventMessage($participant);
-
         // --- Tentukan Langkah Berikutnya Berdasarkan Tipe Event ---
         if ($notification->is_paid) {
             // Event Berbayar: Arahkan ke Halaman Pilihan Pembayaran
             Log::info('ParticipantController@store: Paid event. Redirecting to payment choice.', ['participant_id' => $participant->id]);
-            // Dispatch job untuk cek status nanti JANGAN di sini, tapi setelah pilih Midtrans
             return redirect()->route('payment.choice', ['participant' => $participant->id]);
         } else {
-            // Event Gratis: Langsung kirim notifikasi 'lunas' & arahkan ke Halaman Sukses
+            // Event Gratis: (Alur ini tetap, karena event gratis langsung LUNAS)
             Log::info('ParticipantController@store: Free event. Sending confirmations and redirecting to success page.', ['participant_id' => $participant->id]);
-            $waService->sendPaidConfirmation($participant); // Kirim konfirmasi seolah-olah sudah 'lunas'
+            $waService->sendPaidConfirmation($participant); // Kirim konfirmasi lunas (yg menjadwalkan H-2 & H+6)
             $waService->sendAdminNotification($participant, $request->input('event_type'));
 
             // Kirim notif ke affiliate hanya jika bukan admin

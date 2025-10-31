@@ -29,7 +29,7 @@ class Participant extends Model
         'notified_paid',
         'reminder_scheduled',
         'paid_reminder_scheduled',
-        'post_event_reminder_scheduled', // Jika ada
+        'post_event_reminder_scheduled',
     ];
 
     public function notification()

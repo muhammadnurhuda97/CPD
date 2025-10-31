@@ -87,10 +87,10 @@
                     <input type="hidden" name="notification_id" value="{{ $notification->id }}">
                     <input type="hidden" name="affiliate_id" value="{{ session('affiliate_id') }}">
                     <input type="hidden" name="event_type" value="{{ $notification->event_type }}">
-                    {{-- Pastikan variabel $ref_p dikirim dari controller/route --}}
-                    @if (isset($ref_p) && !empty($ref_p))
-                        <input type="hidden" name="ref_p_input" value="{{ $ref_p }}">
+                    @if (request()->has('ref_p'))
+                        <input type="hidden" name="ref_p" value="{{ request()->query('ref_p') }}">
                     @endif
+
                     <p class="formbold-policy">
                         Dengan mengisi formulir ini dan mengklik kirim, Anda menyetujui <a href="#">kebijakan
                             privasi kami</a>.

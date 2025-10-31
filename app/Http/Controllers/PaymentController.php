@@ -17,18 +17,23 @@ use Midtrans\Transaction as MidtransSdkTransaction;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Models\Notification as EventNotificationModel;
+use App\Services\WhatsAppNotificationService;
 
 class PaymentController extends Controller
 {
     protected $midtransService;
     protected $transactionHandlerService;
+    protected $waService;
+
 
     public function __construct(
         MidtransService $midtransService,
-        TransactionHandlerService $transactionHandlerService
+        TransactionHandlerService $transactionHandlerService,
+        WhatsAppNotificationService $waService // Inject di Constructor
     ) {
         $this->midtransService = $midtransService;
         $this->transactionHandlerService = $transactionHandlerService;
+        $this->waService = $waService; // Simpan service-nya
     }
 
     public function initiatePayment(Request $request, string $type, $identifier)
@@ -411,7 +416,7 @@ class PaymentController extends Controller
     /**
      * Memproses pilihan metode pembayaran dari user.
      */
-    public function selectPaymentMethod(Request $request, Participant $participant)
+    public function selectPaymentMethod(Request $request, Participant $participant) // Hapus $waService dari argumen jika sudah di constructor
     {
         $request->validate([
             'payment_method' => 'required|in:midtrans,cash',
@@ -420,41 +425,73 @@ class PaymentController extends Controller
         $method = $request->input('payment_method');
         Log::info('selectPaymentMethod: Processing payment method selection.', ['participant_id' => $participant->id, 'method' => $method]);
 
-        $participant->load('notification'); // Pastikan data event ada
+        // Load relasi yang dibutuhkan untuk notifikasi
+        $participant->loadMissing(['notification', 'affiliateUser', 'referrer']);
+
         if (!$participant->notification || !$participant->notification->is_paid) {
             Log::error('selectPaymentMethod: Invalid event data or free event.', ['participant_id' => $participant->id]);
             return redirect()->route('payment.error.page')->with('message', 'Event tidak valid untuk pemilihan pembayaran.');
         }
 
-
-        // Update data peserta
+        // 1. Set status di objek
         $participant->payment_method = $method;
         if ($method === 'cash') {
             $participant->payment_status = 'pending_cash_verification';
         } else {
-            // Untuk Midtrans, status akan diupdate saat initiatePayment atau dari webhook
-            // Kita bisa set ke 'pending' di sini jika mau, tapi initiatePayment juga akan melakukannya
             $participant->payment_status = 'pending';
         }
-        $participant->save();
+        $participant->notified_registered = false; // Reset flag notif pendaftaran
 
-        // Arahkan ke langkah selanjutnya
+        // 2. Kirim Notifikasi Awal (ke Peserta, Admin, Affiliate, Referrer)
+        try {
+            // 2a. Ke Peserta (Pendaftaran Awal Berhasil + Link Referral)
+            $this->waService->sendPostEventMessage($participant);
+            Log::info('selectPaymentMethod: Initial post-registration notification sent.', ['participant_id' => $participant->id]);
+
+            // 2b. Ke Admin (Pendaftar BARU, status: Menunggu Tunai / Pending)
+            $this->waService->sendAdminNotification($participant, $participant->event_type);
+            Log::info('selectPaymentMethod: Initial Admin notification sent.', ['participant_id' => $participant->id]);
+
+            // 2c. Ke Affiliate (Pendaftar BARU, status: Menunggu Tunai / Pending)
+            if ($participant->affiliate_id) {
+                // $participant->affiliateUser sudah di-load
+                $this->waService->sendAffiliateNotification($participant->affiliate_id, $participant, $participant->event_type);
+                Log::info('selectPaymentMethod: Initial Affiliate notification sent.', ['participant_id' => $participant->id, 'affiliate_id' => $participant->affiliate_id]);
+            }
+
+            // 2d. Ke Referrer (Pendaftar BARU, status: Menunggu Tunai / Pending)
+            //    (Kita perlu fungsi WA baru untuk ini, atau modifikasi sendReferrerNotification)
+            //    Untuk sekarang, kita panggil sendReferrerNotification (walaupun pesannya mungkin "Lunas", kita perbaiki di WA Service)
+            if ($participant->referrer) {
+                // $participant->referrer sudah di-load
+                // KITA ASUMSIKAN sendReferrerNotification BISA MENANGANI STATUS BELUM LUNAS
+                $this->waService->sendReferrerNotification($participant, $participant->referrer);
+                Log::info('selectPaymentMethod: Initial Referrer notification sent.', ['participant_id' => $participant->id, 'referrer_id' => $participant->referrer->id]);
+            }
+        } catch (\Exception $e) {
+            Log::error('selectPaymentMethod: Failed to send initial notifications.', [
+                'participant_id' => $participant->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+
+        // 3. Simpan semua perubahan (status + flag)
+        $participant->save();
+        Log::info('selectPaymentMethod: Participant status and notification flags saved.', ['participant_id' => $participant->id]);
+
+        // 4. Arahkan ke langkah selanjutnya
         if ($method === 'cash') {
             Log::info('selectPaymentMethod: Redirecting to cash payment instructions.', ['participant_id' => $participant->id]);
-            // Redirect ke halaman instruksi bayar tunai (akan dibuat di step berikutnya)
             return redirect()->route('payment.cash.instructions', ['participant' => $participant->id]);
         } else {
-            // Redirect ke proses inisiasi Midtrans
             Log::info('selectPaymentMethod: Redirecting to Midtrans initiation.', ['participant_id' => $participant->id]);
             return redirect()->route('payment.initiate', [
                 'type' => 'event',
                 'identifier' => $participant->id,
-                'price' => $participant->notification->price // Ambil harga dari event
+                'price' => $participant->notification->price
             ]);
         }
     }
-
-    // ===== AKHIR METHOD BARU =====
 
     // --- Rute baru untuk halaman instruksi cash (akan dibuat view-nya nanti) ---
     public function showCashInstructions(Participant $participant)

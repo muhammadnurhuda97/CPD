@@ -83,6 +83,9 @@
                     <input type="hidden" name="notification_id" value="{{ $notification->id }}">
                     <input type="hidden" name="affiliate_id" value="{{ session('affiliate_id') }}">
                     <input type="hidden" name="event_type" value="{{ $notification->event_type }}">
+                    @if (isset($ref_p) && !empty($ref_p))
+                        <input type="hidden" name="ref_p_input" value="{{ $ref_p }}">
+                    @endif
 
                     <p class="formbold-policy">
                         Dengan mengisi formulir ini dan mengklik kirim, Anda menyetujui <a href="#">kebijakan
